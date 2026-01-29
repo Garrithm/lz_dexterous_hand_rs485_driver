@@ -1,0 +1,211 @@
+# LZ Hand Driver Configuration
+# 灵巧手驱动配置文件
+
+# ===========================================
+# Serial Communication Configuration
+# 串口通信配置
+# ===========================================
+
+serial:
+  # Serial port for right hand
+  # 右手串口
+  right_hand_port: "/dev/ttyUSB0"
+  
+  # Serial port for left hand
+  # 左手串口
+  left_hand_port: "/dev/ttyUSB1"
+  
+  # Baud rate (default: 115200)
+  # 波特率
+  baudrate: 115200
+  
+  # Communication timeout in seconds
+  # 通信超时时间（秒）
+  timeout: 0.1
+
+# ===========================================
+# Hand Configuration
+# 机械手配置
+# ===========================================
+
+hand:
+  # Hand IDs (Modbus slave addresses)
+  # 机械手从机地址
+  right_hand_id: 1
+  left_hand_id: 2
+
+# ===========================================
+# Control Parameters
+# 控制参数
+# ===========================================
+
+control:
+  # Feedback publishing rate in Hz
+  # 反馈发布频率
+  feedback_rate: 50.0
+  
+  # Maximum step size for gradual speed/force adjustment
+  # This prevents sudden changes that could cause impact
+  # 渐进调节步长（防止冲击）
+  gradual_step_size: 100
+  
+  # Default speed for movements (0-1000)
+  # 默认运动速度
+  default_speed: 500
+  
+  # Default force limit (0-1000)
+  # 默认力限制
+  default_force: 500
+
+# ===========================================
+# Joint Limits
+# 关节限制
+# ===========================================
+
+joint_limits:
+  # Position limits (0-1000, unit: 1/1000 of max stroke)
+  # 位置限制
+  position:
+    min: 0
+    max: 1000
+  
+  # Speed limits (0-1000, unit: 1/1000 of rated speed)
+  # 速度限制
+  speed:
+    min: 0
+    max: 1000
+  
+  # Force limits (0-1000, unit: 1/1000 of rated force)
+  # 力限制
+  force:
+    min: 0
+    max: 1000
+
+# ===========================================
+# Force Feedback Configuration
+# 力反馈配置
+# ===========================================
+
+force_feedback:
+  # Valid range for force feedback (in grams)
+  # Values outside this range are considered invalid
+  # 力反馈有效范围（克）
+  valid_min: 750
+  valid_max: 3000
+
+# ===========================================
+# Preset Gestures
+# 预设手势
+# ===========================================
+
+gestures:
+  # Open hand (all fingers extended)
+  # 张开手
+  open:
+    thumb_rotation: 0
+    thumb_bend: 0
+    index_bend: 0
+    middle_bend: 0
+    ring_bend: 0
+    pinky_bend: 0
+  
+  # Closed fist
+  # 握拳
+  fist:
+    thumb_rotation: 500
+    thumb_bend: 1000
+    index_bend: 1000
+    middle_bend: 1000
+    ring_bend: 1000
+    pinky_bend: 1000
+  
+  # Pinch grip (thumb and index)
+  # 捏取
+  pinch:
+    thumb_rotation: 1000
+    thumb_bend: 500
+    index_bend: 500
+    middle_bend: 0
+    ring_bend: 0
+    pinky_bend: 0
+  
+  # Point (index extended)
+  # 指向
+  point:
+    thumb_rotation: 500
+    thumb_bend: 1000
+    index_bend: 0
+    middle_bend: 1000
+    ring_bend: 1000
+    pinky_bend: 1000
+  
+  # Thumbs up
+  # 竖大拇指
+  thumbs_up:
+    thumb_rotation: 0
+    thumb_bend: 0
+    index_bend: 1000
+    middle_bend: 1000
+    ring_bend: 1000
+    pinky_bend: 1000
+  
+  # OK gesture
+  # OK手势
+  ok:
+    thumb_rotation: 1000
+    thumb_bend: 700
+    index_bend: 700
+    middle_bend: 0
+    ring_bend: 0
+    pinky_bend: 0
+  
+  # Peace sign
+  # 剪刀手
+  peace:
+    thumb_rotation: 500
+    thumb_bend: 1000
+    index_bend: 0
+    middle_bend: 0
+    ring_bend: 1000
+    pinky_bend: 1000
+  
+  # Rock gesture
+  # Rock手势
+  rock:
+    thumb_rotation: 500
+    thumb_bend: 1000
+    index_bend: 0
+    middle_bend: 1000
+    ring_bend: 1000
+    pinky_bend: 0
+
+# ===========================================
+# Joint Names for URDF/TF
+# 关节名称（用于URDF/TF）
+# ===========================================
+
+joint_names:
+  right_hand:
+    - right_thumb_rotation_joint
+    - right_thumb_bend_joint
+    - right_index_bend_joint
+    - right_middle_bend_joint
+    - right_ring_bend_joint
+    - right_pinky_bend_joint
+  
+  left_hand:
+    - left_thumb_rotation_joint
+    - left_thumb_bend_joint
+    - left_index_bend_joint
+    - left_middle_bend_joint
+    - left_ring_bend_joint
+    - left_pinky_bend_joint
+
+# ===========================================
+# Frame IDs for TF
+# TF坐标系名称
+# ===========================================
+
+frame_ids:
+  right_hand: right_hand_link
+  left_hand: left_hand_link
