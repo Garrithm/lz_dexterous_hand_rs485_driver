@@ -99,6 +99,13 @@ target_link_libraries(lz_hand_driver_cpp PRIVATE
   ${MODBUS_LIBRARIES}
 )
 
+# Set RPATH so Python module can find liblz_hand_modbus_driver.so at runtime
+# Python module is in lib/${PROJECT_NAME}, dependency is in lib/
+set_target_properties(lz_hand_driver_cpp PROPERTIES
+  INSTALL_RPATH "$ORIGIN/.."
+  BUILD_WITH_INSTALL_RPATH TRUE
+)
+
 # Install Python bindings module to the package directory
 # Install to lib/${PROJECT_NAME} so it can be found by ROS2 Python scripts
 install(TARGETS lz_hand_driver_cpp
@@ -113,6 +120,13 @@ install(TARGETS lz_hand_driver_cpp
 install(PROGRAMS
   scripts/hand_driver_node.py
   scripts/hand_test_node.py
+  scripts/detect_hand_ports.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# 工具脚本（Tools）
+install(PROGRAMS
+  tool/detect_hand_ports.sh
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -135,6 +149,7 @@ install(DIRECTORY
   config
   DESTINATION share/${PROJECT_NAME}
 )
+
 
 # ============================================================
 # Export and Testing

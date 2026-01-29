@@ -10,6 +10,7 @@
 #include <termios.h>
 #include <thread>
 #include <chrono>
+#include <errno.h>
 
 namespace lz_hand
 {
@@ -70,9 +71,21 @@ bool LZHandModbusDriver::connect()
 
   // 连接（Connect）
   if (modbus_connect(ctx_) == -1) {
+    int saved_errno = errno;
     modbus_free(ctx_);
     ctx_ = nullptr;
-    throw ModbusError("Failed to connect: " + std::string(modbus_strerror(errno)));
+    
+    // 检测不同类型的错误并给出明确提示（Detect different error types and provide clear messages）
+    if (saved_errno == EACCES || saved_errno == EPERM) {
+      // 权限错误：设备存在但无权限访问（Permission error: device exists but no access permission）
+      throw ModbusError("串口权限不足（Serial port permission denied）: " + port_);
+    } else if (saved_errno == ENOENT || saved_errno == ENODEV) {
+      // 设备不存在：设备文件不存在（Device not found: device file does not exist）
+      throw ModbusError("串口设备不存在（Serial port not found）: " + port_);
+    }
+    
+    // 其他错误统一处理（Handle other errors uniformly）
+    throw ModbusError("连接失败（Connection failed）: " + std::string(modbus_strerror(saved_errno)));
   }
 
   // 设置RS485模式（Set RS485 mode）

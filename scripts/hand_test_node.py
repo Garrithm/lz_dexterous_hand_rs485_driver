@@ -42,7 +42,7 @@ class LZHandTestNode(Node):
         self._default_speed = self.get_parameter('default_speed').get_parameter_value().integer_value
         self._default_force = self.get_parameter('default_force').get_parameter_value().integer_value
         
-        hand_name = '右手（Right）' if self._hand_id == 1 else '左手（Left）'
+        hand_name = '右手' if self._hand_id == 1 else '左手'
         self.get_logger().info(f'测试节点（Test node）: {hand_name} ID={self._hand_id}')
         
         # QoS配置（QoS profile）
@@ -116,7 +116,7 @@ class LZHandTestNode(Node):
         print('\n' + '=' * 50)
         print('  手部反馈（Hand Feedback）')
         print('=' * 50)
-        print(f'电机位置（Motor pos）: [{fb.thumb_rotation_pos}, {fb.thumb_bend_pos}, {fb.index_bend_pos}, {fb.middle_bend_pos}, {fb.ring_bend_pos}, {fb.pinky_bend_pos}]')
+        print(f'电机位置: [{fb.thumb_rotation_pos}, {fb.thumb_bend_pos}, {fb.index_bend_pos}, {fb.middle_bend_pos}, {fb.ring_bend_pos}, {fb.pinky_bend_pos}]')
         print('=' * 50)
     
     def print_joints(self):

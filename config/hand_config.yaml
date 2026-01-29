@@ -2,8 +2,8 @@
 
 # 串口配置（Serial Configuration）
 serial:
-  right_hand_port: "/dev/ttyUSB0"  # 右手串口（Right hand port）
-  left_hand_port: "/dev/ttyUSB1"   # 左手串口（Left hand port）
+  right_hand_port: "/dev/ttyUSB1"  # 右手串口（Right hand port）
+  left_hand_port: "/dev/ttyUSB0"   # 左手串口（Left hand port）
   baudrate: 115200                  # 波特率（Baud rate）
   timeout: 0.1                      # 超时秒（Timeout in seconds）
 

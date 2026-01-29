@@ -48,6 +48,7 @@ class LZHandDriverNode(Node):
         self._consecutive_errors = 0
         self._last_feedback_time = 0.0
         self._min_feedback_interval = 0.05  # 最小反馈间隔50ms（Min feedback interval）
+        self._permission_error = False  # 权限错误标志（Permission error flag）
         
         # QoS配置（QoS profile）
         qos = QoSProfile(
@@ -62,13 +63,16 @@ class LZHandDriverNode(Node):
         
         # 等待串口稳定（Wait for serial port to settle）
         time.sleep(0.5)
-        self._connect()
+        if not self._connect():
+            # 如果是权限错误，直接退出
+            if self._permission_error:
+                raise SystemExit()
         
         # 创建定时器（Create timers）
         self._feedback_timer = self.create_timer(1.0 / self._feedback_rate, self._feedback_callback)
         self._reconnect_timer = self.create_timer(5.0, self._reconnect_callback)
         
-        hand_name = '右手（Right）' if self._hand_id == 1 else '左手（Left）'
+        hand_name = '右手' if self._hand_id == 1 else '左手'
         self.get_logger().info(f'驱动节点已初始化（Driver initialized）- {hand_name} ID={self._hand_id}')
     
     def _declare_parameters(self):
@@ -114,8 +118,7 @@ class LZHandDriverNode(Node):
         """获取浮点参数（Get float parameter）"""
         p = self.get_parameter(name)
         try:
-            v = p.get_parameter_value().double_value
-            return v if v != 0.0 else float(p.get_parameter_value().string_value)
+            return p.get_parameter_value().double_value
         except:
             return float(p.get_parameter_value().string_value)
     
@@ -171,7 +174,7 @@ class LZHandDriverNode(Node):
     
     def _connect(self) -> bool:
         """连接灵巧手硬件（Connect to hand hardware）"""
-        hand_name = '右手（Right）' if self._hand_id == 1 else '左手（Left）'
+        hand_name = '右手' if self._hand_id == 1 else '左手'
         
         try:
             if self._driver is not None:
@@ -183,7 +186,6 @@ class LZHandDriverNode(Node):
                 time.sleep(0.2)
             
             self.get_logger().info(f'正在连接（Connecting）{hand_name}: {self._port}, ID={self._hand_id}')
-            
             self._driver = LZHandModbusDriver(self._port, self._hand_id, self._baudrate, True)
             
             if self._driver.is_connected():
@@ -191,10 +193,9 @@ class LZHandDriverNode(Node):
                 self._consecutive_errors = 0
                 self._reconnect_attempts = 0
                 self._driver.set_gradual_step_size(self._gradual_step_size)
-                
                 positions = self._driver.read_motor_positions()
                 if positions:
-                    self.get_logger().info(f'连接成功（Connected），电机位置（Motor pos）: {list(positions)}')
+                    self.get_logger().info(f'连接成功（Connected），电机位置: {list(positions)}')
                 else:
                     self.get_logger().info(f'已连接（Connected）{hand_name}')
                 return True
@@ -205,11 +206,16 @@ class LZHandDriverNode(Node):
                 
         except Exception as e:
             self.get_logger().error(f'连接错误（Connection error）: {e}')
+            self._permission_error = True
             self._connected = False
             return False
     
     def _reconnect_callback(self):
         """自动重连定时回调（Auto-reconnection timer callback）"""
+        if self._permission_error:
+            rclpy.shutdown()
+            return
+        
         if not self._auto_reconnect:
             return
         
