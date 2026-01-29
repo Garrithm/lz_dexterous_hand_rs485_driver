@@ -1,34 +1,30 @@
 # ForceFeedback.msg
-# 力反馈专用消息
-# Force feedback message
+# 力反馈消息（Force feedback message）
 
-# Header for timestamp and frame_id
+# 消息头（Header）
 std_msgs/Header header
 
-# Hand selection: 1=right hand, 2=left hand
+# 手ID：1=右手，2=左手（Hand ID: 1=right, 2=left）
 uint8 hand_id
 
-# Force feedback values (unit: gram)
-# Valid range: 750-3000, values outside this range are invalid
+# 指尖力（Fingertip forces）：单位克（unit: gram），有效范围750-3000
+uint16 thumb_tip         # 大拇指指尖（Thumb tip）
+uint16 index_tip         # 食指指尖（Index tip）
+uint16 middle_tip        # 中指指尖（Middle tip）
+uint16 ring_tip          # 无名指指尖（Ring tip）
+uint16 pinky_tip         # 小拇指指尖（Pinky tip）
 
-# Finger tip forces (指尖力)
-uint16 thumb_tip         # 大拇指指尖
-uint16 index_tip         # 食指指尖
-uint16 middle_tip        # 中指指尖
-uint16 ring_tip          # 无名指指尖
-uint16 pinky_tip         # 小拇指指尖
+# 指中力（Mid-finger forces）
+uint16 thumb_mid         # 大拇指指中（Thumb mid）
+uint16 index_mid         # 食指指中（Index mid）
+uint16 middle_mid        # 中指指中（Middle mid）
+uint16 ring_mid          # 无名指指中（Ring mid）
+uint16 pinky_mid         # 小拇指指中（Pinky mid）
 
-# Finger mid forces (指中力)
-uint16 thumb_mid         # 大拇指指中
-uint16 index_mid         # 食指指中
-uint16 middle_mid        # 中指指中
-uint16 ring_mid          # 无名指指中
-uint16 pinky_mid         # 小拇指指中
+# 手掌力（Palm forces）
+uint16 palm_1            # 手掌力1（Palm 1）
+uint16 palm_2            # 手掌力2（Palm 2）
+uint16 palm_3            # 手掌力3（Palm 3）
 
-# Palm forces (手掌力)
-uint16 palm_1            # 手掌力反馈(1)
-uint16 palm_2            # 手掌力反馈(2)
-uint16 palm_3            # 手掌力反馈(3)
-
-# Validity flags (true if in valid range 750-3000)
-bool[] valid_flags       # 13 flags corresponding to above values
+# 有效标志（Validity flags）：共13个，对应上述13个力值
+bool[] valid_flags

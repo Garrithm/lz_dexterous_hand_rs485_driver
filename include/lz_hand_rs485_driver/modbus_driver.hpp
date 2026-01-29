@@ -1,7 +1,6 @@
 /**
  * @file modbus_driver.hpp
- * @brief LZ Hand Modbus-RTU Driver
- * 灵巧手Modbus-RTU通信驱动
+ * @brief 灵巧手Modbus-RTU通信驱动（LZ Hand Modbus-RTU Driver）
  */
 
 #ifndef LZ_HAND_RS485_DRIVER__MODBUS_DRIVER_HPP_
@@ -20,7 +19,7 @@ namespace lz_hand
 {
 
 /**
- * @brief Modbus Communication Exception
+ * @brief Modbus通信异常（Modbus Communication Exception）
  */
 class ModbusError : public std::runtime_error
 {
@@ -30,18 +29,17 @@ public:
 };
 
 /**
- * @brief LZ Hand Modbus-RTU Driver Class
- * 灵巧手Modbus-RTU驱动类
+ * @brief 灵巧手Modbus-RTU驱动类（LZ Hand Modbus-RTU Driver Class）
  */
 class LZHandModbusDriver
 {
 public:
   /**
-   * @brief Constructor
-   * @param port Serial port path (e.g., "/dev/ttyUSB0")
-   * @param hand_id Hand slave address (1=right, 2=left)
-   * @param baudrate Communication baud rate
-   * @param auto_connect Whether to connect automatically
+   * @brief 构造函数（Constructor）
+   * @param port 串口路径（Serial port path），如"/dev/ttyUSB0"
+   * @param hand_id 手从机地址（Hand slave address）：1=右手，2=左手
+   * @param baudrate 波特率（Baud rate）
+   * @param auto_connect 是否自动连接（Whether to auto connect）
    */
   LZHandModbusDriver(
     const std::string & port,
@@ -50,113 +48,118 @@ public:
     bool auto_connect = true);
 
   /**
-   * @brief Destructor
+   * @brief 析构函数（Destructor）
    */
   ~LZHandModbusDriver();
 
-  // Disable copy
+  // 禁用拷贝（Disable copy）
   LZHandModbusDriver(const LZHandModbusDriver &) = delete;
   LZHandModbusDriver & operator=(const LZHandModbusDriver &) = delete;
 
   /**
-   * @brief Connect to the hand
-   * @return true if successful
+   * @brief 连接灵巧手（Connect to hand）
+   * @return 成功返回true（Returns true if successful）
    */
   bool connect();
 
   /**
-   * @brief Disconnect from the hand
+   * @brief 断开连接（Disconnect）
    */
   void disconnect();
 
   /**
-   * @brief Check connection status
+   * @brief 检查连接状态（Check connection status）
    */
   bool is_connected() const { return connected_; }
 
-  // ==================== Position Control ====================
+  // ==================== 位置控制（Position Control） ====================
 
   /**
-   * @brief Set single joint position
-   * @param joint_index Joint index (0-5)
-   * @param position Target position (0-1000)
-   * @return true if successful
+   * @brief 设置单关节位置（Set single joint position）
+   * @param joint_index 关节索引（Joint index）：0-5
+   * @param position 目标位置（Target position）：0-1000
    */
   bool set_joint_position(int joint_index, int position);
 
   /**
-   * @brief Set all joint positions
-   * @param positions Array of 6 position values
-   * @return true if successful
+   * @brief 设置所有关节位置（Set all joint positions）
+   * @param positions 6个位置值数组（Array of 6 position values）
    */
   bool set_all_positions(const std::array<int, 6> & positions);
 
-  // ==================== Speed Control ====================
+  // ==================== 速度控制（Speed Control） ====================
 
   /**
-   * @brief Set single joint speed
-   * @param joint_index Joint index (0-5)
-   * @param speed Target speed (0-1000)
-   * @param gradual Whether to change gradually
-   * @return true if successful
+   * @brief 设置单关节速度（Set single joint speed）
+   * @param joint_index 关节索引（Joint index）：0-5
+   * @param speed 目标速度（Target speed）：0-1000
+   * @param gradual 是否渐进变化（Whether to change gradually）
    */
   bool set_joint_speed(int joint_index, int speed, bool gradual = true);
 
   /**
-   * @brief Set all joint speeds
-   * @param speeds Array of 6 speed values
-   * @param gradual Whether to change gradually
-   * @return true if successful
+   * @brief 设置所有关节速度（Set all joint speeds）
+   * @param speeds 6个速度值数组（Array of 6 speed values）
+   * @param gradual 是否渐进变化（Whether to change gradually）
    */
   bool set_all_speeds(const std::array<int, 6> & speeds, bool gradual = true);
 
-  // ==================== Force Control ====================
+  // ==================== 力控制（Force Control） ====================
 
   /**
-   * @brief Set single joint force
-   * @param joint_index Joint index (0-5)
-   * @param force Target force (0-1000)
-   * @param gradual Whether to change gradually
-   * @return true if successful
+   * @brief 设置单关节力（Set single joint force）
+   * @param joint_index 关节索引（Joint index）：0-5
+   * @param force 目标力（Target force）：0-1000
+   * @param gradual 是否渐进变化（Whether to change gradually）
    */
   bool set_joint_force(int joint_index, int force, bool gradual = true);
 
   /**
-   * @brief Set all joint forces
-   * @param forces Array of 6 force values
-   * @param gradual Whether to change gradually
-   * @return true if successful
+   * @brief 设置所有关节力（Set all joint forces）
+   * @param forces 6个力值数组（Array of 6 force values）
+   * @param gradual 是否渐进变化（Whether to change gradually）
    */
   bool set_all_forces(const std::array<int, 6> & forces, bool gradual = true);
 
-  // ==================== Feedback Reading ====================
+  // ==================== 反馈读取（Feedback Reading） ====================
 
   /**
-   * @brief Read motor positions
-   * @return Array of 6 motor positions, or nullopt if failed
+   * @brief 读取电机位置（Read motor positions）
+   * @return 6个电机位置，失败返回nullopt（6 motor positions, or nullopt if failed）
    */
   std::optional<std::array<int, 6>> read_motor_positions();
 
   /**
-   * @brief Read joint angles
-   * @return Array of 10 angles in degrees, or nullopt if failed
+   * @brief 读取关节角度（Read joint angles）
+   * @return 10个角度值（度），失败返回nullopt（10 angles in degrees, or nullopt if failed）
    */
   std::optional<std::array<double, 10>> read_joint_angles();
 
   /**
-   * @brief Read all feedback data
-   * @return FeedbackData structure, or nullopt if failed
+   * @brief 读取所有反馈数据（Read all feedback data）
+   * @return FeedbackData结构，失败返回nullopt（FeedbackData structure, or nullopt if failed）
    */
   std::optional<FeedbackData> read_all_feedback();
 
-  // ==================== High-Level Control ====================
+  /**
+   * @brief 读取力反馈（Read force feedback）
+   * @return 力值和有效标志，失败返回nullopt（Force values and validity flags, or nullopt if failed）
+   */
+  std::optional<std::pair<std::array<int, 13>, std::array<bool, 13>>> read_force_feedback();
 
   /**
-   * @brief Set complete hand pose
-   * @param positions Position values
-   * @param speeds Optional speed values
-   * @param forces Optional force values
-   * @return true if successful
+   * @brief 读取控制状态（Read control state）
+   * @return 位置、速度、力，失败返回nullopt（Positions, speeds, forces, or nullopt if failed）
+   */
+  std::optional<std::tuple<std::array<int, 6>, std::array<int, 6>, std::array<int, 6>>> read_control_state();
+
+  // ==================== 高级控制（High-Level Control） ====================
+
+  /**
+   * @brief 设置完整手部姿态（Set complete hand pose）
+   * @param positions 位置值（Position values）
+   * @param speeds 可选速度值（Optional speed values）
+   * @param forces 可选力值（Optional force values）
    */
   bool set_hand_pose(
     const std::array<int, 6> & positions,
@@ -164,79 +167,59 @@ public:
     const std::array<int, 6> * forces = nullptr);
 
   /**
-   * @brief Open the hand
-   * @param speed Movement speed
+   * @brief 张开手（Open hand）
+   * @param speed 运动速度（Movement speed）
    */
   bool open_hand(int speed = 500);
 
   /**
-   * @brief Close the hand
-   * @param speed Movement speed
-   * @param force Grip force
+   * @brief 握拳（Close hand）
+   * @param speed 运动速度（Movement speed）
+   * @param force 握力（Grip force）
    */
   bool close_hand(int speed = 500, int force = 500);
 
   /**
-   * @brief Pinch grip pose (thumb opposes index finger)
-   * 捏取姿态
-   * @param strength Grip strength (0-1000)
+   * @brief 捏取姿态（Pinch grip pose）
+   * @param strength 握力强度（Grip strength）：0-1000
    */
   bool pinch_grip(int strength = 500);
 
   /**
-   * @brief Pointing gesture (index extended, others bent)
-   * 指向姿态
+   * @brief 指向姿态（Point gesture）
    */
   bool point_gesture();
 
   /**
-   * @brief OK gesture
-   * OK手势
+   * @brief OK手势（OK gesture）
    */
   bool ok_gesture();
 
   /**
-   * @brief Thumbs up gesture
-   * 竖大拇指
+   * @brief 竖大拇指（Thumbs up gesture）
    */
   bool thumbs_up();
 
-  // ==================== Additional Feedback ====================
+  // ==================== 配置（Configuration） ====================
 
   /**
-   * @brief Read force feedback
-   * @return Force values and validity flags, or nullopt if failed
-   */
-  std::optional<std::pair<std::array<int, 13>, std::array<bool, 13>>> read_force_feedback();
-
-  /**
-   * @brief Read current control state (positions, speeds, forces)
-   * @return Control state data, or nullopt if failed
-   */
-  std::optional<std::tuple<std::array<int, 6>, std::array<int, 6>, std::array<int, 6>>> read_control_state();
-
-  // ==================== Configuration ====================
-
-  /**
-   * @brief Set gradual adjustment step size
-   * @param step_size Maximum change per update
+   * @brief 设置渐进调节步长（Set gradual adjustment step size）
+   * @param step_size 每次更新的最大变化量（Maximum change per update）
    */
   void set_gradual_step_size(int step_size);
 
   /**
-   * @brief Get hand ID
+   * @brief 获取手ID（Get hand ID）
    */
   int get_hand_id() const { return hand_id_; }
 
   /**
-   * @brief Enable/disable debug output
-   * @param enable true to enable debug messages
+   * @brief 启用/禁用调试输出（Enable/disable debug output）
    */
   void set_debug(bool enable);
   
   /**
-   * @brief Enable libmodbus raw debug (shows all bytes)
-   * @param enable true to enable
+   * @brief 启用libmodbus原始调试（Enable libmodbus raw debug）
    */
   void set_raw_debug(bool enable);
 
@@ -249,31 +232,31 @@ private:
   bool connected_ = false;
   mutable std::mutex mutex_;
 
-  // Gradual adjustment state
+  // 渐进调节状态（Gradual adjustment state）
   std::array<int, 6> last_speeds_ = {500, 500, 500, 500, 500, 500};
   std::array<int, 6> last_forces_ = {500, 500, 500, 500, 500, 500};
   int max_step_size_ = 100;
   
-  // Debug flags
+  // 调试标志（Debug flags）
   bool debug_enabled_ = false;
 
   /**
-   * @brief Write single register
+   * @brief 写入单个寄存器（Write single register）
    */
   bool write_register(uint16_t address, uint16_t value);
 
   /**
-   * @brief Write multiple registers
+   * @brief 写入多个寄存器（Write multiple registers）
    */
   bool write_registers(uint16_t address, const uint16_t * values, int count);
 
   /**
-   * @brief Read multiple registers
+   * @brief 读取多个寄存器（Read multiple registers）
    */
   bool read_registers(uint16_t address, uint16_t * values, int count);
 
   /**
-   * @brief Apply gradual adjustment
+   * @brief 应用渐进调节（Apply gradual adjustment）
    */
   int apply_gradual(int target, int current) const;
 };

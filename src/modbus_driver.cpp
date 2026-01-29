@@ -1,16 +1,15 @@
 /**
  * @file modbus_driver.cpp
- * @brief LZ Hand Modbus-RTU Driver Implementation
- * 灵巧手Modbus-RTU通信驱动实现
+ * @brief 灵巧手Modbus-RTU通信驱动实现（LZ Hand Modbus-RTU Driver Implementation）
  */
 
 #include "lz_hand_rs485_driver/modbus_driver.hpp"
 #include <cstring>
 #include <algorithm>
-#include <unistd.h>  // for tcdrain
-#include <termios.h> // for tcdrain
-#include <thread>    // for std::this_thread::sleep_for
-#include <chrono>    // for std::chrono
+#include <unistd.h>
+#include <termios.h>
+#include <thread>
+#include <chrono>
 
 namespace lz_hand
 {
@@ -42,8 +41,7 @@ bool LZHandModbusDriver::connect()
     return true;
   }
 
-  // Create Modbus RTU context
-  // 创建Modbus RTU上下文，波特率115200
+  // 创建Modbus RTU上下文（Create Modbus RTU context）
   ctx_ = modbus_new_rtu(
     port_.c_str(),
     baudrate_,
@@ -55,58 +53,43 @@ bool LZHandModbusDriver::connect()
     throw ModbusError("Failed to create Modbus context: " + std::string(modbus_strerror(errno)));
   }
   
-  // 验证波特率设置（调试用）
   if (debug_enabled_) {
-    fprintf(stderr, "[MODBUS] RTU context created: port=%s, baudrate=%d, parity=%c, bytesize=%d, stopbits=%d\n",
-            port_.c_str(), baudrate_, HandConstants::DEFAULT_PARITY,
-            HandConstants::DEFAULT_BYTESIZE, HandConstants::DEFAULT_STOPBITS);
+    fprintf(stderr, "[MODBUS] RTU context: port=%s, baudrate=%d\n", port_.c_str(), baudrate_);
   }
 
-  // Set slave address
+  // 设置从机地址（Set slave address）
   if (modbus_set_slave(ctx_, hand_id_) == -1) {
     modbus_free(ctx_);
     ctx_ = nullptr;
     throw ModbusError("Failed to set slave address: " + std::string(modbus_strerror(errno)));
   }
 
-  // Set response timeout (100ms)
-  // 设置响应超时，参考新驱动使用100ms超时
-  modbus_set_response_timeout(ctx_, 0, 100000);
-  
-  // Set byte timeout (1ms between bytes)
-  // 设置字节间超时，确保能正确接收完整响应
-  modbus_set_byte_timeout(ctx_, 0, 1000);
+  // 设置超时（Set timeouts）
+  modbus_set_response_timeout(ctx_, 0, 100000);  // 100ms响应超时（response timeout）
+  modbus_set_byte_timeout(ctx_, 0, 1000);        // 1ms字节超时（byte timeout）
 
-  // Connect (must be called before setting RS485 mode)
-  // 连接（必须在设置RS485模式之前调用）
+  // 连接（Connect）
   if (modbus_connect(ctx_) == -1) {
     modbus_free(ctx_);
     ctx_ = nullptr;
     throw ModbusError("Failed to connect: " + std::string(modbus_strerror(errno)));
   }
 
-
+  // 设置RS485模式（Set RS485 mode）
   if (modbus_rtu_set_serial_mode(ctx_, MODBUS_RTU_RS485) == -1) {
     fprintf(stderr, "[WARNING] Failed to set RS485 mode: %s (continuing anyway)\n", 
             modbus_strerror(errno));
   }
 
-  // Set RTS (Request To Send) mode for RS485 direction control
-  // 设置RTS模式以控制RS485发送/接收方向
-  // MODBUS_RTU_RTS_UP: RTS高电平有效（通常用于RS485收发器）
-  // MODBUS_RTU_RTS_DOWN: RTS低电平有效
+  // 设置RTS模式（Set RTS mode）
   if (modbus_rtu_set_rts(ctx_, MODBUS_RTU_RTS_UP) == -1) {
-    // If RTS setting fails, try DOWN mode (some adapters use inverted RTS)
-    // 如果UP模式失败，尝试DOWN模式（某些适配器使用反向RTS）
     if (modbus_rtu_set_rts(ctx_, MODBUS_RTU_RTS_DOWN) == -1) {
-      // If both fail, log warning but continue (some adapters handle RTS automatically)
-      // 如果都失败，记录警告但继续（某些适配器自动处理RTS）
       fprintf(stderr, "[WARNING] Failed to set RTS mode: %s (continuing anyway)\n", 
               modbus_strerror(errno));
     }
   }
 
-  // Test connection by reading motor positions
+  // 测试连接（Test connection）
   uint16_t test_reg;
   if (modbus_read_registers(ctx_, RegisterMap::FB_MOTOR_START, 1, &test_reg) == -1) {
     modbus_close(ctx_);
@@ -137,46 +120,35 @@ bool LZHandModbusDriver::write_register(uint16_t address, uint16_t value)
     return false;
   }
 
-  // Flush any pending data before writing
-  // 写入前清空缓冲区
-  modbus_flush(ctx_);
+  modbus_flush(ctx_);  // 清空缓冲区（Flush buffer）
 
-  // 写入寄存器
   int result = modbus_write_register(ctx_, address, value);
   
   if (result == -1) {
     if (debug_enabled_) {
-      fprintf(stderr, "[MODBUS] write_register(addr=%d, value=%d) FAILED: %s (errno=%d)\n",
-              address, value, modbus_strerror(errno), errno);
+      fprintf(stderr, "[MODBUS] write_register(addr=%d, value=%d) FAILED: %s\n",
+              address, value, modbus_strerror(errno));
     }
     return false;
   }
 
-  // 关键优化：等待数据发送完成（参考新驱动的tcdrain）
-  // 这对于RS485半双工通信非常重要，确保数据完全发送后再切换方向
+  // 等待数据发送完成（Wait for data to be sent）
   int fd = modbus_get_socket(ctx_);
   if (fd >= 0) {
-    tcdrain(fd);  // 等待所有数据发送完成
-    // 小延迟确保设备有时间处理请求（参考新驱动的做法）
+    tcdrain(fd);
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
 
-  // 验证写入响应（写单个寄存器时，响应应该与请求相同）
-  // 读取响应来验证写入是否成功
+  // 验证写入（Verify write）
   uint16_t read_value;
   if (modbus_read_registers(ctx_, address, 1, &read_value) != -1) {
-    if (read_value != value) {
-      if (debug_enabled_) {
-        fprintf(stderr, "[MODBUS] write_register(addr=%d) verification failed: wrote=%d, read=%d\n",
-                address, value, read_value);
-      }
-      // 不返回false，因为写入可能成功但设备还没更新
+    if (read_value != value && debug_enabled_) {
+      fprintf(stderr, "[MODBUS] write verification: wrote=%d, read=%d\n", value, read_value);
     }
   }
 
   if (debug_enabled_) {
-    fprintf(stderr, "[MODBUS] write_register(addr=%d, value=%d) OK\n",
-            address, value);
+    fprintf(stderr, "[MODBUS] write_register(addr=%d, value=%d) OK\n", address, value);
   }
   
   return true;
@@ -188,45 +160,26 @@ bool LZHandModbusDriver::write_registers(uint16_t address, const uint16_t * valu
     return false;
   }
 
-  // Flush any pending data before writing
-  // 写入前清空缓冲区
   modbus_flush(ctx_);
 
-  // 写入多个寄存器
   int result = modbus_write_registers(ctx_, address, count, values);
   
   if (result == -1) {
     if (debug_enabled_) {
-      fprintf(stderr, "[MODBUS] write_registers(addr=%d, count=%d) FAILED: %s (errno=%d)\n",
-              address, count, modbus_strerror(errno), errno);
+      fprintf(stderr, "[MODBUS] write_registers(addr=%d, count=%d) FAILED: %s\n",
+              address, count, modbus_strerror(errno));
     }
     return false;
   }
 
   int fd = modbus_get_socket(ctx_);
   if (fd >= 0) {
-    tcdrain(fd);  // 等待所有数据发送完成
-    // 小延迟确保设备有时间处理请求（参考新驱动的做法）
+    tcdrain(fd);
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
 
-  // 验证写入响应（写多个寄存器时，可以读取第一个寄存器验证）
-  if (count > 0) {
-    uint16_t read_value;
-    if (modbus_read_registers(ctx_, address, 1, &read_value) != -1) {
-      if (read_value != values[0]) {
-        if (debug_enabled_) {
-          fprintf(stderr, "[MODBUS] write_registers(addr=%d) verification failed: wrote=%d, read=%d\n",
-                  address, values[0], read_value);
-        }
-        // 不返回false，因为写入可能成功但设备还没更新
-      }
-    }
-  }
-
   if (debug_enabled_) {
-    fprintf(stderr, "[MODBUS] write_registers(addr=%d, count=%d) OK\n",
-            address, count);
+    fprintf(stderr, "[MODBUS] write_registers(addr=%d, count=%d) OK\n", address, count);
   }
   
   return true;
@@ -251,7 +204,7 @@ int LZHandModbusDriver::apply_gradual(int target, int current) const
   return target;
 }
 
-// ==================== Position Control ====================
+// ==================== 位置控制（Position Control） ====================
 
 bool LZHandModbusDriver::set_joint_position(int joint_index, int position)
 {
@@ -276,7 +229,7 @@ bool LZHandModbusDriver::set_all_positions(const std::array<int, 6> & positions)
   return write_registers(RegisterMap::POS_START, values.data(), 6);
 }
 
-// ==================== Speed Control ====================
+// ==================== 速度控制（Speed Control） ====================
 
 bool LZHandModbusDriver::set_joint_speed(int joint_index, int speed, bool gradual)
 {
@@ -311,7 +264,7 @@ bool LZHandModbusDriver::set_all_speeds(const std::array<int, 6> & speeds, bool 
   return write_registers(RegisterMap::SPEED_START, values.data(), 6);
 }
 
-// ==================== Force Control ====================
+// ==================== 力控制（Force Control） ====================
 
 bool LZHandModbusDriver::set_joint_force(int joint_index, int force, bool gradual)
 {
@@ -346,7 +299,7 @@ bool LZHandModbusDriver::set_all_forces(const std::array<int, 6> & forces, bool 
   return write_registers(RegisterMap::FORCE_START, values.data(), 6);
 }
 
-// ==================== Feedback Reading ====================
+// ==================== 反馈读取（Feedback Reading） ====================
 
 std::optional<std::array<int, 6>> LZHandModbusDriver::read_motor_positions()
 {
@@ -393,18 +346,18 @@ std::optional<FeedbackData> LZHandModbusDriver::read_all_feedback()
 
   FeedbackData data;
 
-  // Parse force feedback (registers 18-30, offset 0-12)
+  // 解析力反馈（Parse force feedback）：寄存器18-30
   for (int i = 0; i < 13; ++i) {
     data.force_values[i] = static_cast<int>(regs[i]);
     data.force_valid[i] = HandConstants::is_force_valid(data.force_values[i]);
   }
 
-  // Parse angle feedback (registers 31-40, offset 13-22)
+  // 解析角度反馈（Parse angle feedback）：寄存器31-40
   for (int i = 0; i < 10; ++i) {
     data.joint_angles[i] = HandConstants::angle_to_degrees(static_cast<int>(regs[13 + i]));
   }
 
-  // Parse motor positions (registers 41-46, offset 23-28)
+  // 解析电机位置（Parse motor positions）：寄存器41-46
   for (int i = 0; i < 6; ++i) {
     data.motor_positions[i] = static_cast<int>(regs[23 + i]);
   }
@@ -412,7 +365,7 @@ std::optional<FeedbackData> LZHandModbusDriver::read_all_feedback()
   return data;
 }
 
-// ==================== High-Level Control ====================
+// ==================== 高级控制（High-Level Control） ====================
 
 bool LZHandModbusDriver::set_hand_pose(
   const std::array<int, 6> & positions,
@@ -451,54 +404,26 @@ bool LZHandModbusDriver::close_hand(int speed, int force)
 
 bool LZHandModbusDriver::pinch_grip(int strength)
 {
-  std::array<int, 6> positions = {
-    1000,  // Thumb rotation (fully rotated for opposition)
-    500,   // Thumb bend
-    500,   // Index bend
-    0,     // Middle straight
-    0,     // Ring straight
-    0      // Pinky straight
-  };
+  std::array<int, 6> positions = {1000, 500, 500, 0, 0, 0};
   std::array<int, 6> forces = {strength, strength, strength, strength, strength, strength};
   return set_hand_pose(positions, nullptr, &forces);
 }
 
 bool LZHandModbusDriver::point_gesture()
 {
-  std::array<int, 6> positions = {
-    500,   // Thumb rotation
-    1000,  // Thumb bent
-    0,     // Index straight (pointing)
-    1000,  // Middle bent
-    1000,  // Ring bent
-    1000   // Pinky bent
-  };
+  std::array<int, 6> positions = {500, 1000, 0, 1000, 1000, 1000};
   return set_all_positions(positions);
 }
 
 bool LZHandModbusDriver::ok_gesture()
 {
-  std::array<int, 6> positions = {
-    1000,  // Thumb rotation
-    700,   // Thumb bend (touching index)
-    700,   // Index bend (touching thumb)
-    0,     // Middle straight
-    0,     // Ring straight
-    0      // Pinky straight
-  };
+  std::array<int, 6> positions = {1000, 700, 700, 0, 0, 0};
   return set_all_positions(positions);
 }
 
 bool LZHandModbusDriver::thumbs_up()
 {
-  std::array<int, 6> positions = {
-    0,     // Thumb rotation (not rotated)
-    0,     // Thumb straight (up)
-    1000,  // Index bent
-    1000,  // Middle bent
-    1000,  // Ring bent
-    1000   // Pinky bent
-  };
+  std::array<int, 6> positions = {0, 0, 1000, 1000, 1000, 1000};
   return set_all_positions(positions);
 }
 
@@ -548,15 +473,14 @@ void LZHandModbusDriver::set_gradual_step_size(int step_size)
 void LZHandModbusDriver::set_debug(bool enable)
 {
   debug_enabled_ = enable;
-  fprintf(stderr, "[MODBUS] Debug mode %s\n", enable ? "ENABLED" : "DISABLED");
+  fprintf(stderr, "[MODBUS] Debug %s\n", enable ? "ENABLED" : "DISABLED");
 }
 
 void LZHandModbusDriver::set_raw_debug(bool enable)
 {
   if (ctx_ != nullptr) {
     modbus_set_debug(ctx_, enable ? TRUE : FALSE);
-    fprintf(stderr, "[MODBUS] Raw debug mode %s (shows all bytes on stderr)\n", 
-            enable ? "ENABLED" : "DISABLED");
+    fprintf(stderr, "[MODBUS] Raw debug %s\n", enable ? "ENABLED" : "DISABLED");
   }
 }
 

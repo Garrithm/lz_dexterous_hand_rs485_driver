@@ -1,29 +1,26 @@
 # JointFeedback.msg
-# 关节反馈消息（简化版，用于单独查询）
-# Joint feedback message (simplified, for individual queries)
+# 单关节反馈消息（Single joint feedback message）
 
-# Header for timestamp and frame_id
+# 消息头（Header）
 std_msgs/Header header
 
-# Hand selection: 1=right hand, 2=left hand
+# 手ID：1=右手，2=左手（Hand ID: 1=right, 2=left）
 uint8 hand_id
 
-# Joint name
+# 关节名称（Joint name）
 string joint_name
 
-# Motor position (0-1000, unit: 1/1000 of max stroke)
+# 电机位置（Motor position）：0-1000
 uint16 motor_position
 
-# Joint angles (unit: 0.1 degree)
-# For thumb: mid_angle and root_angle both available
-# For other fingers: mid_angle and root_angle
-uint16 mid_joint_angle
-uint16 root_joint_angle
+# 关节角度（Joint angles）：单位0.1度（unit: 0.1 degree）
+uint16 mid_joint_angle     # 指中关节角度（Mid joint angle）
+uint16 root_joint_angle    # 指根关节角度（Root joint angle）
 
-# Force feedback at fingertip and mid-joint (unit: gram)
-uint16 tip_force
-uint16 mid_force
+# 力反馈（Force feedback）：单位克（unit: gram）
+uint16 tip_force           # 指尖力（Tip force）
+uint16 mid_force           # 指中力（Mid force）
 
-# Validity flags
+# 有效标志（Validity flags）
 bool tip_force_valid
 bool mid_force_valid

@@ -1,27 +1,26 @@
 # JointControl.msg
-# 单关节控制消息
-# Control message for individual joint
+# 单关节控制消息（Single joint control message）
 
-# Header for timestamp and frame_id
+# 消息头（Header）
 std_msgs/Header header
 
-# Hand selection: 1=right hand, 2=left hand
+# 手ID：1=右手，2=左手（Hand ID: 1=right, 2=left）
 uint8 hand_id
 
-# Joint index (0-5)
-# 0: thumb_rotation (大拇指翻转)
-# 1: thumb_bend (大拇指弯曲)
-# 2: index_bend (食指弯曲)
-# 3: middle_bend (中指弯曲)
-# 4: ring_bend (无名指弯曲)
-# 5: pinky_bend (小拇指弯曲)
+# 关节索引（Joint index）：0-5
+# 0: 大拇指翻转（thumb rotation）
+# 1: 大拇指弯曲（thumb bend）
+# 2: 食指弯曲（index bend）
+# 3: 中指弯曲（middle bend）
+# 4: 无名指弯曲（ring bend）
+# 5: 小拇指弯曲（pinky bend）
 uint8 joint_index
 
-# Position (0-1000, unit: 1/1000 of max stroke)
+# 位置（Position）：0-1000
 uint16 position
 
-# Speed (0-1000, unit: 1/1000 of rated speed, optional)
+# 速度（Speed）：0-1000，可选
 uint16 speed
 
-# Force (0-1000, unit: 1/1000 of rated force, optional)
+# 力（Force）：0-1000，可选
 uint16 force

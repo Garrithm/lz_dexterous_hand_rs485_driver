@@ -1,7 +1,6 @@
 /**
  * @file hand_constants.hpp
- * @brief LZ Hand Constants and Register Map
- * 灵巧手常量定义和寄存器映射
+ * @brief 灵巧手常量定义和寄存器映射（LZ Hand Constants and Register Map）
  */
 
 #ifndef LZ_HAND_RS485_DRIVER__HAND_CONSTANTS_HPP_
@@ -16,78 +15,74 @@ namespace lz_hand
 {
 
 /**
- * @brief Hand ID (Slave Address)
- * 机械手从机地址
+ * @brief 手ID/从机地址（Hand ID / Slave Address）
  */
 enum class HandID : uint8_t
 {
-  RIGHT_HAND = 1,  // 右手
-  LEFT_HAND = 2    // 左手
+  RIGHT_HAND = 1,  // 右手（Right hand）
+  LEFT_HAND = 2    // 左手（Left hand）
 };
 
 /**
- * @brief Joint Index
- * 关节索引
+ * @brief 关节索引（Joint Index）
  */
 enum class JointIndex : uint8_t
 {
-  THUMB_ROTATION = 0,  // 大拇指翻转
-  THUMB_BEND = 1,      // 大拇指弯曲
-  INDEX_BEND = 2,      // 食指弯曲
-  MIDDLE_BEND = 3,     // 中指弯曲
-  RING_BEND = 4,       // 无名指弯曲
-  PINKY_BEND = 5       // 小拇指弯曲
+  THUMB_ROTATION = 0,  // 大拇指翻转（Thumb rotation）
+  THUMB_BEND = 1,      // 大拇指弯曲（Thumb bend）
+  INDEX_BEND = 2,      // 食指弯曲（Index bend）
+  MIDDLE_BEND = 3,     // 中指弯曲（Middle bend）
+  RING_BEND = 4,       // 无名指弯曲（Ring bend）
+  PINKY_BEND = 5       // 小拇指弯曲（Pinky bend）
 };
 
 /**
- * @brief Register Map
- * 寄存器地址映射
+ * @brief 寄存器映射（Register Map）
  */
 struct RegisterMap
 {
-  // Position Control Registers (0-5)
+  // 位置控制寄存器（Position control registers）：0-5
   static constexpr uint16_t POS_START = 0;
   static constexpr uint16_t POS_COUNT = 6;
 
-  // Speed Control Registers (6-11)
+  // 速度控制寄存器（Speed control registers）：6-11
   static constexpr uint16_t SPEED_START = 6;
   static constexpr uint16_t SPEED_COUNT = 6;
 
-  // Force Control Registers (12-17)
+  // 力控制寄存器（Force control registers）：12-17
   static constexpr uint16_t FORCE_START = 12;
   static constexpr uint16_t FORCE_COUNT = 6;
 
-  // Force Feedback Registers (18-30)
+  // 力反馈寄存器（Force feedback registers）：18-30
   static constexpr uint16_t FB_FORCE_START = 18;
   static constexpr uint16_t FB_FORCE_COUNT = 13;
 
-  // Angle Feedback Registers (31-40)
+  // 角度反馈寄存器（Angle feedback registers）：31-40
   static constexpr uint16_t FB_ANGLE_START = 31;
   static constexpr uint16_t FB_ANGLE_COUNT = 10;
 
-  // Motor Position Feedback Registers (41-46)
+  // 电机位置反馈寄存器（Motor position feedback registers）：41-46
   static constexpr uint16_t FB_MOTOR_START = 41;
   static constexpr uint16_t FB_MOTOR_COUNT = 6;
 
-  // All Feedback Registers (18-46)
+  // 所有反馈寄存器（All feedback registers）：18-46
   static constexpr uint16_t ALL_FEEDBACK_START = 18;
   static constexpr uint16_t ALL_FEEDBACK_COUNT = 29;
 };
 
 /**
- * @brief Hand Constants
- * 机械手常量
+ * @brief 机械手常量（Hand Constants）
  */
 struct HandConstants
 {
-  // Communication parameters
+  // 通信参数（Communication parameters）
   static constexpr int DEFAULT_BAUDRATE = 115200;
   static constexpr int DEFAULT_BYTESIZE = 8;
   static constexpr char DEFAULT_PARITY = 'N';
   static constexpr int DEFAULT_STOPBITS = 1;
   static constexpr double DEFAULT_TIMEOUT = 0.1;
 
-  // Value ranges
+  // 数值范围（Value ranges）
   static constexpr int POSITION_MIN = 0;
   static constexpr int POSITION_MAX = 1000;
   static constexpr int SPEED_MIN = 0;
@@ -95,19 +90,19 @@ struct HandConstants
   static constexpr int FORCE_MIN = 0;
   static constexpr int FORCE_MAX = 1000;
 
-  // Force feedback valid range
+  // 力反馈有效范围克（Force feedback valid range in grams）
   static constexpr int FORCE_FEEDBACK_MIN = 750;
   static constexpr int FORCE_FEEDBACK_MAX = 3000;
 
-  // Angle unit: 0.1 degree
+  // 角度单位：0.1度（Angle unit: 0.1 degree）
   static constexpr double ANGLE_UNIT = 0.1;
 
-  // Number of joints/sensors
+  // 关节/传感器数量（Number of joints/sensors）
   static constexpr int NUM_JOINTS = 6;
   static constexpr int NUM_FORCE_SENSORS = 13;
   static constexpr int NUM_ANGLE_SENSORS = 10;
 
-  // Utility functions
+  // 工具函数（Utility functions）
   static inline bool is_force_valid(int force_value)
   {
     return force_value >= FORCE_FEEDBACK_MIN && force_value <= FORCE_FEEDBACK_MAX;
@@ -135,8 +130,7 @@ struct HandConstants
 };
 
 /**
- * @brief Hand State Data Structure
- * 机械手状态数据结构
+ * @brief 机械手状态数据结构（Hand State Data Structure）
  */
 struct HandState
 {
@@ -158,8 +152,7 @@ struct HandState
 };
 
 /**
- * @brief Feedback Data Structure
- * 反馈数据结构
+ * @brief 反馈数据结构（Feedback Data Structure）
  */
 struct FeedbackData
 {

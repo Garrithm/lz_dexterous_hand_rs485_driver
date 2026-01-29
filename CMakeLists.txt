@@ -109,10 +109,16 @@ install(TARGETS lz_hand_driver_cpp
 # Python Scripts (ROS2节点)
 # ============================================================
 
+# ROS2节点脚本
 install(PROGRAMS
   scripts/hand_driver_node.py
   scripts/hand_test_node.py
-  scripts/simple_driver_test.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# 独立测试脚本（不依赖ROS，用于硬件调试）
+install(PROGRAMS
+  demo/simple_driver_test.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

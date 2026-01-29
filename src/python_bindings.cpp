@@ -1,7 +1,6 @@
 /**
  * @file python_bindings.cpp
- * @brief Python bindings for LZ Hand Modbus Driver using pybind11
- * 使用pybind11创建的Python绑定
+ * @brief 灵巧手驱动Python绑定（LZ Hand Driver Python Bindings using pybind11）
  */
 
 #include <pybind11/pybind11.h>
@@ -15,27 +14,27 @@ namespace py = pybind11;
 using namespace lz_hand;
 
 PYBIND11_MODULE(lz_hand_driver_cpp, m) {
-  m.doc() = "LZ Hand Modbus Driver C++ bindings (灵巧手Modbus驱动C++绑定)";
+  m.doc() = "灵巧手Modbus驱动C++绑定（LZ Hand Modbus Driver C++ Bindings）";
 
-  // ==================== Enums ====================
+  // ==================== 枚举（Enums） ====================
 
-  py::enum_<HandID>(m, "HandID", "Hand ID / 机械手ID")
-    .value("RIGHT_HAND", HandID::RIGHT_HAND, "右手")
-    .value("LEFT_HAND", HandID::LEFT_HAND, "左手")
+  py::enum_<HandID>(m, "HandID", "手ID（Hand ID）")
+    .value("RIGHT_HAND", HandID::RIGHT_HAND, "右手（Right hand）")
+    .value("LEFT_HAND", HandID::LEFT_HAND, "左手（Left hand）")
     .export_values();
 
-  py::enum_<JointIndex>(m, "JointIndex", "Joint Index / 关节索引")
-    .value("THUMB_ROTATION", JointIndex::THUMB_ROTATION, "大拇指翻转")
-    .value("THUMB_BEND", JointIndex::THUMB_BEND, "大拇指弯曲")
-    .value("INDEX_BEND", JointIndex::INDEX_BEND, "食指弯曲")
-    .value("MIDDLE_BEND", JointIndex::MIDDLE_BEND, "中指弯曲")
-    .value("RING_BEND", JointIndex::RING_BEND, "无名指弯曲")
-    .value("PINKY_BEND", JointIndex::PINKY_BEND, "小拇指弯曲")
+  py::enum_<JointIndex>(m, "JointIndex", "关节索引（Joint Index）")
+    .value("THUMB_ROTATION", JointIndex::THUMB_ROTATION, "大拇指翻转（Thumb rotation）")
+    .value("THUMB_BEND", JointIndex::THUMB_BEND, "大拇指弯曲（Thumb bend）")
+    .value("INDEX_BEND", JointIndex::INDEX_BEND, "食指弯曲（Index bend）")
+    .value("MIDDLE_BEND", JointIndex::MIDDLE_BEND, "中指弯曲（Middle bend）")
+    .value("RING_BEND", JointIndex::RING_BEND, "无名指弯曲（Ring bend）")
+    .value("PINKY_BEND", JointIndex::PINKY_BEND, "小拇指弯曲（Pinky bend）")
     .export_values();
 
-  // ==================== RegisterMap ====================
+  // ==================== 寄存器映射（Register Map） ====================
 
-  py::class_<RegisterMap>(m, "RegisterMap", "Register Map / 寄存器映射")
+  py::class_<RegisterMap>(m, "RegisterMap", "寄存器映射（Register Map）")
     .def_readonly_static("POS_START", &RegisterMap::POS_START)
     .def_readonly_static("POS_COUNT", &RegisterMap::POS_COUNT)
     .def_readonly_static("SPEED_START", &RegisterMap::SPEED_START)
@@ -51,9 +50,9 @@ PYBIND11_MODULE(lz_hand_driver_cpp, m) {
     .def_readonly_static("ALL_FEEDBACK_START", &RegisterMap::ALL_FEEDBACK_START)
     .def_readonly_static("ALL_FEEDBACK_COUNT", &RegisterMap::ALL_FEEDBACK_COUNT);
 
-  // ==================== HandConstants ====================
+  // ==================== 常量（Constants） ====================
 
-  py::class_<HandConstants>(m, "HandConstants", "Hand Constants / 机械手常量")
+  py::class_<HandConstants>(m, "HandConstants", "机械手常量（Hand Constants）")
     .def_readonly_static("DEFAULT_BAUDRATE", &HandConstants::DEFAULT_BAUDRATE)
     .def_readonly_static("DEFAULT_BYTESIZE", &HandConstants::DEFAULT_BYTESIZE)
     .def_readonly_static("DEFAULT_PARITY", &HandConstants::DEFAULT_PARITY)
@@ -72,28 +71,26 @@ PYBIND11_MODULE(lz_hand_driver_cpp, m) {
     .def_readonly_static("NUM_FORCE_SENSORS", &HandConstants::NUM_FORCE_SENSORS)
     .def_readonly_static("NUM_ANGLE_SENSORS", &HandConstants::NUM_ANGLE_SENSORS)
     .def_static("is_force_valid", &HandConstants::is_force_valid, py::arg("force_value"),
-                "Check if force feedback value is valid / 检查力反馈值是否有效")
+                "检查力反馈值是否有效（Check if force value is valid）")
     .def_static("clamp_position", &HandConstants::clamp_position, py::arg("value"),
-                "Clamp position value to valid range / 限制位置值在有效范围内")
+                "限制位置值范围（Clamp position value）")
     .def_static("clamp_speed", &HandConstants::clamp_speed, py::arg("value"),
-                "Clamp speed value to valid range / 限制速度值在有效范围内")
+                "限制速度值范围（Clamp speed value）")
     .def_static("clamp_force", &HandConstants::clamp_force, py::arg("value"),
-                "Clamp force value to valid range / 限制力值在有效范围内")
+                "限制力值范围（Clamp force value）")
     .def_static("angle_to_degrees", &HandConstants::angle_to_degrees, py::arg("raw_value"),
-                "Convert raw angle value to degrees / 将原始角度值转换为度数");
+                "转换角度值为度（Convert angle to degrees）");
 
-  // ==================== FeedbackData ====================
+  // ==================== 数据结构（Data Structures） ====================
 
-  py::class_<FeedbackData>(m, "FeedbackData", "Feedback Data Structure / 反馈数据结构")
+  py::class_<FeedbackData>(m, "FeedbackData", "反馈数据结构（Feedback Data Structure）")
     .def(py::init<>())
     .def_readwrite("force_values", &FeedbackData::force_values)
     .def_readwrite("force_valid", &FeedbackData::force_valid)
     .def_readwrite("joint_angles", &FeedbackData::joint_angles)
     .def_readwrite("motor_positions", &FeedbackData::motor_positions);
 
-  // ==================== HandState ====================
-
-  py::class_<HandState>(m, "HandState", "Hand State Structure / 机械手状态结构")
+  py::class_<HandState>(m, "HandState", "机械手状态结构（Hand State Structure）")
     .def(py::init<>())
     .def_readwrite("hand_id", &HandState::hand_id)
     .def_readwrite("connected", &HandState::connected)
@@ -107,66 +104,63 @@ PYBIND11_MODULE(lz_hand_driver_cpp, m) {
     .def_readwrite("palm_forces", &HandState::palm_forces)
     .def_readwrite("palm_forces_valid", &HandState::palm_forces_valid);
 
-  // ==================== ModbusError ====================
+  // ==================== 异常（Exception） ====================
 
   py::register_exception<ModbusError>(m, "ModbusError");
 
-  // ==================== LZHandModbusDriver ====================
+  // ==================== 驱动类（Driver Class） ====================
 
   py::class_<LZHandModbusDriver>(m, "LZHandModbusDriver",
-    "LZ Hand Modbus-RTU Driver / 灵巧手Modbus-RTU驱动类")
+    "灵巧手Modbus-RTU驱动类（LZ Hand Modbus-RTU Driver Class）")
     .def(py::init<const std::string &, int, int, bool>(),
          py::arg("port"),
          py::arg("hand_id") = 1,
          py::arg("baudrate") = HandConstants::DEFAULT_BAUDRATE,
          py::arg("auto_connect") = true,
-         "Constructor / 构造函数")
+         "构造函数（Constructor）")
 
-    // Connection
-    .def("connect", &LZHandModbusDriver::connect,
-         "Connect to the hand / 连接到机械手")
-    .def("disconnect", &LZHandModbusDriver::disconnect,
-         "Disconnect from the hand / 断开连接")
-    .def("is_connected", &LZHandModbusDriver::is_connected,
-         "Check connection status / 检查连接状态")
+    // 连接（Connection）
+    .def("connect", &LZHandModbusDriver::connect, "连接（Connect）")
+    .def("disconnect", &LZHandModbusDriver::disconnect, "断开连接（Disconnect）")
+    .def("is_connected", &LZHandModbusDriver::is_connected, "检查连接状态（Check connection）")
 
-    // Position Control
+    // 位置控制（Position control）
     .def("set_joint_position", &LZHandModbusDriver::set_joint_position,
          py::arg("joint_index"), py::arg("position"),
-         "Set single joint position / 设置单个关节位置")
+         "设置单关节位置（Set single joint position）")
     .def("set_all_positions", &LZHandModbusDriver::set_all_positions,
          py::arg("positions"),
-         "Set all joint positions / 设置所有关节位置")
+         "设置所有关节位置（Set all joint positions）")
 
-    // Speed Control
+    // 速度控制（Speed control）
     .def("set_joint_speed", &LZHandModbusDriver::set_joint_speed,
          py::arg("joint_index"), py::arg("speed"), py::arg("gradual") = true,
-         "Set single joint speed / 设置单个关节速度")
+         "设置单关节速度（Set single joint speed）")
     .def("set_all_speeds", &LZHandModbusDriver::set_all_speeds,
          py::arg("speeds"), py::arg("gradual") = true,
-         "Set all joint speeds / 设置所有关节速度")
+         "设置所有关节速度（Set all joint speeds）")
 
-    // Force Control
+    // 力控制（Force control）
     .def("set_joint_force", &LZHandModbusDriver::set_joint_force,
          py::arg("joint_index"), py::arg("force"), py::arg("gradual") = true,
-         "Set single joint force / 设置单个关节力")
+         "设置单关节力（Set single joint force）")
     .def("set_all_forces", &LZHandModbusDriver::set_all_forces,
          py::arg("forces"), py::arg("gradual") = true,
-         "Set all joint forces / 设置所有关节力")
+         "设置所有关节力（Set all joint forces）")
 
-    // Feedback Reading
+    // 反馈读取（Feedback reading）
     .def("read_motor_positions", &LZHandModbusDriver::read_motor_positions,
-         "Read motor positions / 读取电机位置")
+         "读取电机位置（Read motor positions）")
     .def("read_joint_angles", &LZHandModbusDriver::read_joint_angles,
-         "Read joint angles / 读取关节角度")
+         "读取关节角度（Read joint angles）")
     .def("read_force_feedback", &LZHandModbusDriver::read_force_feedback,
-         "Read force feedback / 读取力反馈")
+         "读取力反馈（Read force feedback）")
     .def("read_all_feedback", &LZHandModbusDriver::read_all_feedback,
-         "Read all feedback data / 读取所有反馈数据")
+         "读取所有反馈数据（Read all feedback）")
     .def("read_control_state", &LZHandModbusDriver::read_control_state,
-         "Read control state (positions, speeds, forces) / 读取控制状态")
+         "读取控制状态（Read control state）")
 
-    // High-Level Control
+    // 高级控制（High-level control）
     .def("set_hand_pose", [](LZHandModbusDriver &self,
                              const std::array<int, 6> &positions,
                              const py::object &speeds,
@@ -188,39 +182,20 @@ PYBIND11_MODULE(lz_hand_driver_cpp, m) {
          py::arg("positions"),
          py::arg("speeds") = py::none(),
          py::arg("forces") = py::none(),
-         "Set complete hand pose / 设置完整手部姿态")
+         "设置完整手部姿态（Set complete hand pose）")
 
-    .def("open_hand", &LZHandModbusDriver::open_hand,
-         py::arg("speed") = 500,
-         "Open the hand / 张开手")
-    .def("close_hand", &LZHandModbusDriver::close_hand,
-         py::arg("speed") = 500, py::arg("force") = 500,
-         "Close the hand / 握拳")
-    .def("pinch_grip", &LZHandModbusDriver::pinch_grip,
-         py::arg("strength") = 500,
-         "Pinch grip pose / 捏取姿态")
-    .def("point_gesture", &LZHandModbusDriver::point_gesture,
-         "Pointing gesture / 指向姿态")
-    .def("ok_gesture", &LZHandModbusDriver::ok_gesture,
-         "OK gesture / OK手势")
-    .def("thumbs_up", &LZHandModbusDriver::thumbs_up,
-         "Thumbs up gesture / 竖大拇指")
+    .def("open_hand", &LZHandModbusDriver::open_hand, py::arg("speed") = 500, "张开手（Open hand）")
+    .def("close_hand", &LZHandModbusDriver::close_hand, py::arg("speed") = 500, py::arg("force") = 500, "握拳（Close hand）")
+    .def("pinch_grip", &LZHandModbusDriver::pinch_grip, py::arg("strength") = 500, "捏取姿态（Pinch grip）")
+    .def("point_gesture", &LZHandModbusDriver::point_gesture, "指向姿态（Point gesture）")
+    .def("ok_gesture", &LZHandModbusDriver::ok_gesture, "OK手势（OK gesture）")
+    .def("thumbs_up", &LZHandModbusDriver::thumbs_up, "竖大拇指（Thumbs up）")
 
-    // Configuration
-    .def("set_gradual_step_size", &LZHandModbusDriver::set_gradual_step_size,
-         py::arg("step_size"),
-         "Set gradual adjustment step size / 设置渐进调节步长")
-    .def("get_hand_id", &LZHandModbusDriver::get_hand_id,
-         "Get hand ID / 获取机械手ID")
-    
-    // Debug
-    .def("set_debug", &LZHandModbusDriver::set_debug,
-         py::arg("enable"),
-         "Enable/disable debug output / 启用/禁用调试输出")
-    .def("set_raw_debug", &LZHandModbusDriver::set_raw_debug,
-         py::arg("enable"),
-         "Enable/disable libmodbus raw debug (shows all bytes) / 启用libmodbus原始调试");
+    // 配置（Configuration）
+    .def("set_gradual_step_size", &LZHandModbusDriver::set_gradual_step_size, py::arg("step_size"), "设置渐进步长（Set gradual step size）")
+    .def("get_hand_id", &LZHandModbusDriver::get_hand_id, "获取手ID（Get hand ID）")
+    .def("set_debug", &LZHandModbusDriver::set_debug, py::arg("enable"), "启用调试（Enable debug）")
+    .def("set_raw_debug", &LZHandModbusDriver::set_raw_debug, py::arg("enable"), "启用原始调试（Enable raw debug）");
 
-  // Module version
   m.attr("__version__") = "1.0.0";
 }
