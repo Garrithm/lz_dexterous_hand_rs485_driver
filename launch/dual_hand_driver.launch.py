@@ -72,6 +72,7 @@ def launch_setup(context):
         DeclareLaunchArgument('auto_reconnect', default_value='true', description='自动重连（Auto reconnect）'),
         
         GroupAction([
+            PushRosNamespace('lz'),
             PushRosNamespace('right_hand'),
             Node(
                 package='lz_hand_rs485_driver',
@@ -91,6 +92,7 @@ def launch_setup(context):
         ], condition=IfCondition(LaunchConfiguration('right_enabled'))),
         
         GroupAction([
+            PushRosNamespace('lz'),
             PushRosNamespace('left_hand'),
             Node(
                 package='lz_hand_rs485_driver',

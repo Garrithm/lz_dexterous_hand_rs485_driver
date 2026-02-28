@@ -1,9 +1,17 @@
 # 灵巧手驱动配置文件（LZ Hand Driver Configuration）
 
 # 串口配置（Serial Configuration）
+# 支持两种连接方式（Supports two connection methods）:
+#   1. USB转串口（USB-to-Serial）: /dev/ttyUSB0, /dev/ttyUSB1, ...
+#   2. 直接485接口（Direct RS485）: /dev/ttyS0, /dev/ttyS1, /dev/ttyAMA0, ...
+# 根据实际硬件连接方式配置相应的设备路径
+# Configure device paths according to your hardware connection
 serial:
-  right_hand_port: "/dev/ttyUSB1"  # 右手串口（Right hand port）
-  left_hand_port: "/dev/ttyUSB0"   # 左手串口（Left hand port）
+  right_hand_port: "/dev/ttyUSB0"  # 右手串口（Right hand port）
+  left_hand_port: "/dev/ttyUSB1"   # 左手串口（Left hand port）
+  # 直接485接口示例（Direct RS485 example）:
+  # right_hand_port: "/dev/ttyS0"
+  # left_hand_port: "/dev/ttyS1"
   baudrate: 115200                  # 波特率（Baud rate）
   timeout: 0.1                      # 超时秒（Timeout in seconds）
 

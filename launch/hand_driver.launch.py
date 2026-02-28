@@ -82,7 +82,7 @@ def launch_setup(context):
         DeclareLaunchArgument('baudrate', default_value=str(defaults['baudrate']), description='波特率（Baud rate）'),
         DeclareLaunchArgument('feedback_rate', default_value=str(defaults['feedback_rate']), description='反馈频率Hz（Feedback rate）'),
         DeclareLaunchArgument('auto_reconnect', default_value='true', description='自动重连（Auto reconnect）'),
-        DeclareLaunchArgument('namespace', default_value='', description='命名空间（Namespace）'),
+        DeclareLaunchArgument('namespace', default_value='lz', description='命名空间（Namespace），默认/lz/'),
         
         Node(
             package='lz_hand_rs485_driver',

@@ -33,28 +33,37 @@ class LZHandTestNode(Node):
         
         # 声明参数（Declare parameters）
         self.declare_parameter('hand_id', 1)
+        self.declare_parameter('dual', False)
         self.declare_parameter('default_speed', 500)
         self.declare_parameter('default_force', 500)
         
         # 加载参数（Load parameters）
         param = self.get_parameter('hand_id').value
         self._hand_id = int(param) if isinstance(param, str) else param
+        self._dual = self.get_parameter('dual').get_parameter_value().bool_value
         self._default_speed = self.get_parameter('default_speed').get_parameter_value().integer_value
         self._default_force = self.get_parameter('default_force').get_parameter_value().integer_value
         
+        # 话题前缀：双手模式按hand_id区分，单手模式统一/lz/
+        if self._dual:
+            hand_ns = 'right_hand' if self._hand_id == 1 else 'left_hand'
+            prefix = f'/lz/{hand_ns}'
+        else:
+            prefix = '/lz'
+        
         hand_name = '右手' if self._hand_id == 1 else '左手'
-        self.get_logger().info(f'测试节点（Test node）: {hand_name} ID={self._hand_id}')
+        self.get_logger().info(f'测试节点（Test node）: {hand_name} ID={self._hand_id}, 话题前缀: {prefix}/')
         
         # QoS配置（QoS profile）
         qos = QoSProfile(reliability=ReliabilityPolicy.RELIABLE, history=HistoryPolicy.KEEP_LAST, depth=10)
         
         # 发布者（Publishers）
-        self._hand_pub = self.create_publisher(HandControl, 'hand_control', qos)
-        self._joint_pub = self.create_publisher(JointControl, 'joint_control', qos)
+        self._hand_pub = self.create_publisher(HandControl, f'{prefix}/hand_control', qos)
+        self._joint_pub = self.create_publisher(JointControl, f'{prefix}/joint_control', qos)
         
         # 订阅者（Subscribers）
-        self._feedback_sub = self.create_subscription(HandFeedback, 'hand_feedback', lambda m: setattr(self, '_feedback', m), qos)
-        self._joint_sub = self.create_subscription(JointState, 'joint_states', lambda m: setattr(self, '_joints', m), qos)
+        self._feedback_sub = self.create_subscription(HandFeedback, f'{prefix}/hand_feedback', lambda m: setattr(self, '_feedback', m), qos)
+        self._joint_sub = self.create_subscription(JointState, f'{prefix}/joint_states', lambda m: setattr(self, '_joints', m), qos)
         
         # 状态（State）
         self._feedback: Optional[HandFeedback] = None
@@ -97,12 +106,8 @@ class LZHandTestNode(Node):
     
     # 手势（Gestures）
     def open_hand(self): self.send_hand([0, 0, 0, 0, 0, 0])           # 张开（Open）
-    def close_hand(self): self.send_hand([1000, 1000, 1000, 1000, 1000, 1000])  # 握拳（Close）
     def thumbs_up(self): self.send_hand([0, 0, 1000, 1000, 1000, 1000])  # 竖大拇指（Thumbs up）
-    def point(self): self.send_hand([500, 1000, 0, 1000, 1000, 1000])    # 指向（Point）
     def peace(self): self.send_hand([500, 1000, 0, 0, 1000, 1000])       # 和平（Peace）
-    def rock(self): self.send_hand([500, 1000, 0, 1000, 1000, 0])        # 摇滚（Rock）
-    def ok(self): self.send_hand([1000, 700, 700, 0, 0, 0])              # OK手势（OK）
     def pinch(self): self.send_hand([1000, 500, 500, 0, 0, 0])           # 捏取（Pinch）
     def three(self): self.send_hand([0, 0, 0, 0, 1000, 1000])            # 三指（Three）
     def four(self): self.send_hand([500, 1000, 0, 0, 0, 0])              # 四指（Four）
@@ -137,11 +142,9 @@ def print_menu():
     print('\n' + '=' * 55)
     print('  灵巧手测试（LZ Hand Test）')
     print('=' * 55)
-    print('  [1] 张开（Open）     [2] 握拳（Close）')
-    print('  [3] 指向（Point）    [4] 竖拇指（Thumbs up）')
-    print('  [5] OK手势（OK）     [6] 摇滚（Rock）')
-    print('  [7] 和平（Peace）    [8] 捏取（Pinch）')
-    print('  [9] 三指（Three）    [0] 四指（Four）')
+    print('  [1] 张开（Open）     [2] 竖拇指（Thumbs up）')
+    print('  [3] 和平（Peace）    [4] 捏取（Pinch）')
+    print('  [5] 三指（Three）    [6] 四指（Four）')
     print('  [d] 演示（Demo）     [f] 反馈（Feedback）')
     print('  [j] 关节（Joints）   [h] 帮助（Help）')
     print('  [p] p <关节> <位置>  [a] a <位置>')
@@ -152,8 +155,7 @@ def print_menu():
 
 def run_demo(node):
     """运行演示序列（Run demo sequence）"""
-    gestures = [node.open_hand, node.close_hand, node.open_hand, node.thumbs_up, 
-                node.point, node.peace, node.rock, node.ok, node.pinch, node.open_hand]
+    gestures = [node.open_hand, node.thumbs_up, node.peace, node.pinch, node.open_hand]
     print('\n=== 演示开始（Demo Start） ===')
     for i, g in enumerate(gestures, 1):
         print(f'[{i}/{len(gestures)}]')
@@ -178,15 +180,11 @@ def run_interactive(node, executor):
             
             if c in ['q', 'quit']: break
             elif c == '1': node.open_hand()
-            elif c == '2': node.close_hand()
-            elif c == '3': node.point()
-            elif c == '4': node.thumbs_up()
-            elif c == '5': node.ok()
-            elif c == '6': node.rock()
-            elif c == '7': node.peace()
-            elif c == '8': node.pinch()
-            elif c == '9': node.three()
-            elif c == '0': node.four()
+            elif c == '2': node.thumbs_up()
+            elif c == '3': node.peace()
+            elif c == '4': node.pinch()
+            elif c == '5': node.three()
+            elif c == '6': node.four()
             elif c == 'd': run_demo(node)
             elif c == 'f': node.print_feedback()
             elif c == 'j': node.print_joints()

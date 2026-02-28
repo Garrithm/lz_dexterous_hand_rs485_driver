@@ -3,6 +3,12 @@
 灵巧手串口检测工具（LZ Hand Port Detection Tool）
 自动扫描USB串口并识别hand_id（1=右手，2=左手）
 Automatically scan USB serial ports and identify hand_id (1=right, 2=left)
+
+注意（Note）:
+  - 此工具仅用于USB转串口（/dev/ttyUSB*）场景
+  - This tool is only for USB-to-Serial (/dev/ttyUSB*) connections
+  - 直接485接口用户无需使用此工具，直接在配置文件中指定设备路径即可
+  - Direct RS485 users don't need this tool, just configure device path in config file
 """
 
 import sys
@@ -12,27 +18,93 @@ import time
 
 
 def setup_driver_path():
-    """设置C++驱动路径（Setup C++ driver path）"""
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    possible_paths = [script_dir]
+    """设置C++驱动路径（Setup C++ driver path）
     
-    if 'src' in script_dir or 'scripts' in script_dir:
-        package_dir = os.path.dirname(script_dir)
-        possible_paths.extend([
-            os.path.join(package_dir, '..', '..', 'install', 'lz_hand_rs485_driver', 'lib', 'lz_hand_rs485_driver'),
-            os.path.join(package_dir, '..', '..', 'build', 'lz_hand_rs485_driver'),
-        ])
+    查找策略（按优先级）:
+    1. 直接导入检查（如果已 source install/setup.bash）
+    2. 脚本所在目录（install 后 .so 与脚本同目录）
+    3. AMENT_PREFIX_PATH 环境变量（如果已 source）
+    4. 从脚本位置向上查找 workspace 根目录（包含 install/ 或 build/）
+    5. 从当前工作目录向上查找 workspace 根目录
     
-    for path in possible_paths:
-        abs_path = os.path.abspath(path)
-        if os.path.exists(abs_path):
-            module_file = os.path.join(abs_path, 'lz_hand_driver_cpp.cpython-*.so')
-            if glob.glob(module_file) or os.path.exists(abs_path):
-                if abs_path not in sys.path:
-                    sys.path.insert(0, abs_path)
+    适用场景:
+    - 脚本在 src/ 下（源码）：向上找 workspace
+    - 脚本在 install/ 下（已安装）：检查同目录
+    - 从任意目录运行：向上找 workspace
+    """
+    import importlib.util
+
+    MODULE_NAME = 'lz_hand_driver_cpp'
+    PACKAGE_NAME = 'lz_hand_rs485_driver'
+    SO_PATTERN = MODULE_NAME + '.cpython-*.so'
+
+    def _try_path(path):
+        """尝试将路径加入 sys.path 并验证模块可导入"""
+        if not path or not os.path.isdir(path):
+            return False
+        if not glob.glob(os.path.join(path, SO_PATTERN)):
+            return False
+        if path not in sys.path:
+            sys.path.insert(0, path)
+        return importlib.util.find_spec(MODULE_NAME) is not None
+
+    def _find_in_workspace(ws_root):
+        """在 workspace 根目录下的 install/ 和 build/ 中查找"""
+        for sub in [
+            os.path.join('install', PACKAGE_NAME, 'lib', PACKAGE_NAME),
+            os.path.join('build', PACKAGE_NAME),
+        ]:
+            lib_path = os.path.join(ws_root, sub)
+            if _try_path(lib_path):
                 return True
-    
-    print("[ERROR] 找不到C++驱动库，请先编译: colcon build --packages-select lz_hand_rs485_driver")
+        return False
+
+    def _walk_up_to_workspace(start_dir, max_levels=10):
+        """从 start_dir 向上逐级查找 workspace 根目录（包含 install/ 或 build/）"""
+        current = os.path.abspath(start_dir)
+        for _ in range(max_levels):
+            if os.path.isdir(os.path.join(current, 'install')) or \
+               os.path.isdir(os.path.join(current, 'build')):
+                if _find_in_workspace(current):
+                    return True
+            parent = os.path.dirname(current)
+            if parent == current:  # 到达根目录
+                break
+            current = parent
+        return False
+
+    # 方法1: 已经可以直接导入（最快路径，如已 source setup.bash）
+    if importlib.util.find_spec(MODULE_NAME) is not None:
+        return True
+
+    # 方法2: 脚本所在目录（install 后 .so 与脚本同目录）
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    if _try_path(script_dir):
+        return True
+
+    # 方法3: AMENT_PREFIX_PATH（如果已 source install/setup.bash）
+    for prefix in os.environ.get('AMENT_PREFIX_PATH', '').split(os.pathsep):
+        if prefix:
+            lib_path = os.path.join(prefix, 'lib', PACKAGE_NAME)
+            if _try_path(lib_path):
+                return True
+
+    # 方法4: 从脚本位置向上查找 workspace
+    if _walk_up_to_workspace(script_dir):
+        return True
+
+    # 方法5: 从当前工作目录向上查找 workspace（如果与脚本目录不同）
+    cwd = os.getcwd()
+    if os.path.abspath(cwd) != os.path.abspath(script_dir):
+        if _walk_up_to_workspace(cwd):
+            return True
+
+    # 全部失败
+    print(f"[ERROR] 找不到C++驱动库 {MODULE_NAME}")
+    print("请确保:")
+    print(f"  1. 已编译: colcon build --packages-select {PACKAGE_NAME}")
+    print("  2. 已source: source install/setup.bash")
+    print("  3. 或在 workspace 根目录（包含 install/ 的目录）下运行此脚本")
     return False
 
 

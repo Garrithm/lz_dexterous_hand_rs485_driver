@@ -193,6 +193,9 @@ PYBIND11_MODULE(lz_hand_driver_cpp, m) {
 
     // 配置（Configuration）
     .def("set_gradual_step_size", &LZHandModbusDriver::set_gradual_step_size, py::arg("step_size"), "设置渐进步长（Set gradual step size）")
+    .def("set_bus_protection", &LZHandModbusDriver::set_bus_protection,
+         py::arg("txn_interval_us") = 2000, py::arg("write_settle_us") = 3000, py::arg("max_retries") = 2,
+         "设置总线保护参数（Set bus protection parameters）")
     .def("get_hand_id", &LZHandModbusDriver::get_hand_id, "获取手ID（Get hand ID）")
     .def("set_debug", &LZHandModbusDriver::set_debug, py::arg("enable"), "启用调试（Enable debug）")
     .def("set_raw_debug", &LZHandModbusDriver::set_raw_debug, py::arg("enable"), "启用原始调试（Enable raw debug）");

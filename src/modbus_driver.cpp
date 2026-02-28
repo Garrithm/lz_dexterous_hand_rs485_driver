@@ -127,44 +127,53 @@ void LZHandModbusDriver::disconnect()
   connected_ = false;
 }
 
+void LZHandModbusDriver::throttle()
+{
+  auto now = std::chrono::steady_clock::now();
+  auto elapsed_us = std::chrono::duration_cast<std::chrono::microseconds>(
+    now - last_txn_time_).count();
+  if (elapsed_us < txn_interval_us_) {
+    std::this_thread::sleep_for(
+      std::chrono::microseconds(txn_interval_us_ - elapsed_us));
+  }
+  last_txn_time_ = std::chrono::steady_clock::now();
+}
+
+void LZHandModbusDriver::post_write_settle()
+{
+  if (write_settle_us_ > 0) {
+    std::this_thread::sleep_for(std::chrono::microseconds(write_settle_us_));
+    last_txn_time_ = std::chrono::steady_clock::now();
+  }
+}
+
 bool LZHandModbusDriver::write_register(uint16_t address, uint16_t value)
 {
   if (!connected_ || ctx_ == nullptr) {
     return false;
   }
 
-  modbus_flush(ctx_);  // 清空缓冲区（Flush buffer）
+  for (int attempt = 0; attempt <= max_retries_; ++attempt) {
+    throttle();
+    modbus_flush(ctx_);
 
-  int result = modbus_write_register(ctx_, address, value);
-  
-  if (result == -1) {
+    if (modbus_write_register(ctx_, address, value) != -1) {
+      if (debug_enabled_) {
+        fprintf(stderr, "[MODBUS] write_register(addr=%d, value=%d) OK\n", address, value);
+      }
+      post_write_settle();
+      return true;
+    }
+
     if (debug_enabled_) {
-      fprintf(stderr, "[MODBUS] write_register(addr=%d, value=%d) FAILED: %s\n",
-              address, value, modbus_strerror(errno));
+      fprintf(stderr, "[MODBUS] write_register(addr=%d, value=%d) FAILED (attempt %d/%d): %s\n",
+              address, value, attempt + 1, max_retries_ + 1, modbus_strerror(errno));
     }
-    return false;
-  }
-
-  // 等待数据发送完成（Wait for data to be sent）
-  int fd = modbus_get_socket(ctx_);
-  if (fd >= 0) {
-    tcdrain(fd);
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  }
-
-  // 验证写入（Verify write）
-  uint16_t read_value;
-  if (modbus_read_registers(ctx_, address, 1, &read_value) != -1) {
-    if (read_value != value && debug_enabled_) {
-      fprintf(stderr, "[MODBUS] write verification: wrote=%d, read=%d\n", value, read_value);
+    if (attempt < max_retries_) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(3));
     }
   }
-
-  if (debug_enabled_) {
-    fprintf(stderr, "[MODBUS] write_register(addr=%d, value=%d) OK\n", address, value);
-  }
-  
-  return true;
+  return false;
 }
 
 bool LZHandModbusDriver::write_registers(uint16_t address, const uint16_t * values, int count)
@@ -173,29 +182,27 @@ bool LZHandModbusDriver::write_registers(uint16_t address, const uint16_t * valu
     return false;
   }
 
-  modbus_flush(ctx_);
+  for (int attempt = 0; attempt <= max_retries_; ++attempt) {
+    throttle();
+    modbus_flush(ctx_);
 
-  int result = modbus_write_registers(ctx_, address, count, values);
-  
-  if (result == -1) {
-    if (debug_enabled_) {
-      fprintf(stderr, "[MODBUS] write_registers(addr=%d, count=%d) FAILED: %s\n",
-              address, count, modbus_strerror(errno));
+    if (modbus_write_registers(ctx_, address, count, values) != -1) {
+      if (debug_enabled_) {
+        fprintf(stderr, "[MODBUS] write_registers(addr=%d, count=%d) OK\n", address, count);
+      }
+      post_write_settle();
+      return true;
     }
-    return false;
-  }
 
-  int fd = modbus_get_socket(ctx_);
-  if (fd >= 0) {
-    tcdrain(fd);
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    if (debug_enabled_) {
+      fprintf(stderr, "[MODBUS] write_registers(addr=%d, count=%d) FAILED (attempt %d/%d): %s\n",
+              address, count, attempt + 1, max_retries_ + 1, modbus_strerror(errno));
+    }
+    if (attempt < max_retries_) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(3));
+    }
   }
-
-  if (debug_enabled_) {
-    fprintf(stderr, "[MODBUS] write_registers(addr=%d, count=%d) OK\n", address, count);
-  }
-  
-  return true;
+  return false;
 }
 
 bool LZHandModbusDriver::read_registers(uint16_t address, uint16_t * values, int count)
@@ -204,8 +211,23 @@ bool LZHandModbusDriver::read_registers(uint16_t address, uint16_t * values, int
     return false;
   }
 
-  int result = modbus_read_registers(ctx_, address, count, values);
-  return result != -1;
+  for (int attempt = 0; attempt <= max_retries_; ++attempt) {
+    throttle();
+    modbus_flush(ctx_);
+
+    if (modbus_read_registers(ctx_, address, count, values) != -1) {
+      return true;
+    }
+
+    if (debug_enabled_) {
+      fprintf(stderr, "[MODBUS] read_registers(addr=%d, count=%d) FAILED (attempt %d/%d): %s\n",
+              address, count, attempt + 1, max_retries_ + 1, modbus_strerror(errno));
+    }
+    if (attempt < max_retries_) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(3));
+    }
+  }
+  return false;
 }
 
 int LZHandModbusDriver::apply_gradual(int target, int current) const
@@ -481,6 +503,17 @@ std::optional<std::tuple<std::array<int, 6>, std::array<int, 6>, std::array<int,
 void LZHandModbusDriver::set_gradual_step_size(int step_size)
 {
   max_step_size_ = std::max(1, std::min(step_size, 1000));
+}
+
+void LZHandModbusDriver::set_bus_protection(int txn_interval_us, int write_settle_us, int max_retries)
+{
+  txn_interval_us_ = std::max(0, txn_interval_us);
+  write_settle_us_ = std::max(0, write_settle_us);
+  max_retries_ = std::max(0, std::min(max_retries, 10));
+  if (debug_enabled_) {
+    fprintf(stderr, "[MODBUS] Bus protection: interval=%dus, settle=%dus, retries=%d\n",
+            txn_interval_us_, write_settle_us_, max_retries_);
+  }
 }
 
 void LZHandModbusDriver::set_debug(bool enable)

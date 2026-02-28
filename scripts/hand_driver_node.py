@@ -21,10 +21,83 @@ from lz_hand_rs485_driver.msg import (
     HandControl, JointControl, HandFeedback,
     JointFeedback, ForceFeedback, MotorFeedback,
 )
-from lz_hand_driver_cpp import (
-    LZHandModbusDriver, HandConstants, RegisterMap,
-    HandID, JointIndex, ModbusError,
-)
+try:
+    from lz_hand_driver_cpp import (
+        LZHandModbusDriver, HandConstants, RegisterMap,
+        HandID, JointIndex, ModbusError,
+    )
+except ImportError:
+    # 回退: 尝试自动查找C++驱动库（Fallback: auto-find C++ driver）
+    import sys
+    import os
+    import glob
+    import importlib.util
+
+    _MODULE = 'lz_hand_driver_cpp'
+    _PKG = 'lz_hand_rs485_driver'
+    _SO = _MODULE + '.cpython-*.so'
+
+    def _try_add(p):
+        """尝试将路径加入 sys.path 并验证模块可导入"""
+        if not p or not os.path.isdir(p):
+            return False
+        if not glob.glob(os.path.join(p, _SO)):
+            return False
+        if p not in sys.path:
+            sys.path.insert(0, p)
+        return importlib.util.find_spec(_MODULE) is not None
+
+    def _find_in_workspace(ws_root):
+        """在 workspace 根目录下的 install/ 和 build/ 中查找"""
+        for sub in [
+            os.path.join('install', _PKG, 'lib', _PKG),
+            os.path.join('build', _PKG),
+        ]:
+            if _try_add(os.path.join(ws_root, sub)):
+                return True
+        return False
+
+    def _walk_up_to_workspace(start_dir, max_levels=10):
+        """从 start_dir 向上逐级查找 workspace 根目录"""
+        current = os.path.abspath(start_dir)
+        for _ in range(max_levels):
+            if os.path.isdir(os.path.join(current, 'install')) or \
+               os.path.isdir(os.path.join(current, 'build')):
+                if _find_in_workspace(current):
+                    return True
+            parent = os.path.dirname(current)
+            if parent == current:
+                break
+            current = parent
+        return False
+
+    # 查找驱动库
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # 1. 脚本所在目录（install 后 .so 同目录）
+    if _try_add(script_dir):
+        pass  # 找到，继续导入
+    # 2. AMENT_PREFIX_PATH
+    elif any(_try_add(os.path.join(pfx, 'lib', _PKG)) 
+             for pfx in os.environ.get('AMENT_PREFIX_PATH', '').split(os.pathsep) if pfx):
+        pass  # 找到，继续导入
+    # 3. 从脚本位置向上找 workspace
+    elif _walk_up_to_workspace(script_dir):
+        pass  # 找到，继续导入
+    # 4. 从 CWD 向上找 workspace
+    elif os.path.abspath(os.getcwd()) != os.path.abspath(script_dir) and _walk_up_to_workspace(os.getcwd()):
+        pass  # 找到，继续导入
+    else:
+        raise ImportError(
+            f"无法找到C++驱动库 {_MODULE}。"
+            f"请先编译: colcon build --packages-select {_PKG} "
+            f"然后: source install/setup.bash"
+        )
+
+    from lz_hand_driver_cpp import (
+        LZHandModbusDriver, HandConstants, RegisterMap,
+        HandID, JointIndex, ModbusError,
+    )
 
 
 class LZHandDriverNode(Node):
@@ -49,6 +122,7 @@ class LZHandDriverNode(Node):
         self._last_feedback_time = 0.0
         self._min_feedback_interval = 0.05  # 最小反馈间隔50ms（Min feedback interval）
         self._permission_error = False  # 权限错误标志（Permission error flag）
+        self._write_pending = False  # 写优先标志（Write-priority flag）
         
         # QoS配置（QoS profile）
         qos = QoSProfile(
@@ -245,9 +319,10 @@ class LZHandDriverNode(Node):
         if not self._connected:
             return
         
-        # 检查hand_id是否匹配（Check hand_id match）
         if msg.hand_id != 0 and msg.hand_id != self._hand_id:
             return
+        
+        self._write_pending = True
         
         with self._lock:
             try:
@@ -258,12 +333,10 @@ class LZHandDriverNode(Node):
                 positions = [msg.thumb_rotation, msg.thumb_bend, msg.index_bend, 
                            msg.middle_bend, msg.ring_bend, msg.pinky_bend]
                 
-                # 速度默认500（Default speed 500）
                 speeds = [s if s > 0 else 500 for s in [
                     msg.thumb_rotation_speed, msg.thumb_bend_speed, msg.index_speed,
                     msg.middle_speed, msg.ring_speed, msg.pinky_speed]]
                 
-                # 力默认500（Default force 500）
                 forces = [f if f > 0 else 500 for f in [
                     msg.thumb_rotation_force, msg.thumb_bend_force, msg.index_force,
                     msg.middle_force, msg.ring_force, msg.pinky_force]]
@@ -276,6 +349,8 @@ class LZHandDriverNode(Node):
             except Exception as e:
                 self._consecutive_errors += 1
                 self.get_logger().error(f'控制错误（Control error）: {e}')
+            finally:
+                self._write_pending = False
     
     def _joint_control_callback(self, msg: JointControl):
         """处理单关节控制消息（Handle single joint control message）"""
@@ -287,6 +362,8 @@ class LZHandDriverNode(Node):
         
         if msg.joint_index > 5:
             return
+        
+        self._write_pending = True
         
         with self._lock:
             try:
@@ -302,13 +379,55 @@ class LZHandDriverNode(Node):
             except Exception as e:
                 self._consecutive_errors += 1
                 self.get_logger().error(f'关节控制错误（Joint control error）: {e}')
+            finally:
+                self._write_pending = False
+    
+    def _read_feedback_batch(self):
+        """一次读29个寄存器（Single read of 29 registers）"""
+        all_fb = self._driver.read_all_feedback()
+        if all_fb is None:
+            return None
+        force_values = list(all_fb.force_values)
+        force_valid = list(all_fb.force_valid)
+        return {
+            'force_feedback': force_values[:10],
+            'force_valid': force_valid[:10],
+            'palm_forces': force_values[10:13],
+            'palm_valid': force_valid[10:13],
+            'joint_angles': list(all_fb.joint_angles),
+            'motor_positions': list(all_fb.motor_positions),
+        }
+    
+    def _read_feedback_individual(self):
+        """分3次读，作为回退（Fallback: 3 separate reads）"""
+        motor_positions = self._driver.read_motor_positions()
+        if motor_positions is None:
+            return None
+        force_result = self._driver.read_force_feedback()
+        if force_result:
+            force_values, force_valid = list(force_result[0]), list(force_result[1])
+        else:
+            force_values, force_valid = [0] * 13, [False] * 13
+        joint_angles = self._driver.read_joint_angles()
+        if joint_angles is None:
+            joint_angles = [0.0] * 10
+        return {
+            'force_feedback': force_values[:10],
+            'force_valid': force_valid[:10],
+            'palm_forces': force_values[10:13],
+            'palm_valid': force_valid[10:13],
+            'joint_angles': list(joint_angles),
+            'motor_positions': list(motor_positions),
+        }
     
     def _feedback_callback(self):
         """读取并发布反馈数据（Read and publish feedback）"""
         if not self._connected:
             return
         
-        # 频率限制（Rate limiting）
+        if self._write_pending:
+            return
+        
         current_time = time.time()
         if current_time - self._last_feedback_time < self._min_feedback_interval:
             return
@@ -321,41 +440,16 @@ class LZHandDriverNode(Node):
                 
                 self._last_feedback_time = current_time
                 
-                # 读取电机位置（Read motor positions）
-                motor_positions = self._driver.read_motor_positions()
-                if motor_positions is None:
+                # 优先一次读，失败则回退分次读（Batch read, fallback to individual）
+                feedback = self._read_feedback_batch()
+                if feedback is None:
+                    feedback = self._read_feedback_individual()
+                if feedback is None:
                     self._consecutive_errors += 1
                     return
                 
-                time.sleep(0.01)
-                
-                # 读取力反馈（Read force feedback）
-                force_result = self._driver.read_force_feedback()
-                if force_result:
-                    force_values, force_valid = force_result
-                else:
-                    force_values, force_valid = [0] * 13, [False] * 13
-                
-                time.sleep(0.01)
-                
-                # 读取关节角度（Read joint angles）
-                joint_angles = self._driver.read_joint_angles()
-                if joint_angles is None:
-                    joint_angles = [0.0] * 10
-                
                 self._consecutive_errors = 0
                 
-                # 构建反馈数据（Build feedback data）
-                feedback = {
-                    'force_feedback': list(force_values)[:10],
-                    'force_valid': list(force_valid)[:10],
-                    'palm_forces': list(force_values)[10:13],
-                    'palm_valid': list(force_valid)[10:13],
-                    'joint_angles': list(joint_angles),
-                    'motor_positions': list(motor_positions),
-                }
-                
-                # 发布反馈（Publish feedback）
                 now = self.get_clock().now().to_msg()
                 self._publish_hand_feedback(feedback, now)
                 self._publish_force_feedback(feedback, now)

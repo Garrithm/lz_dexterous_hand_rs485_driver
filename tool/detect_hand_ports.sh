@@ -2,6 +2,12 @@
 # 灵巧手串口检测脚本（LZ Hand Port Detection Script）
 # 自动检测USB串口对应的hand_id
 # Automatically detect hand_id for USB serial ports
+#
+# 注意（Note）:
+#   - 此脚本仅用于USB转串口（/dev/ttyUSB*）场景
+#   - This script is only for USB-to-Serial (/dev/ttyUSB*) connections
+#   - 直接485接口用户无需使用此脚本，直接配置设备路径即可
+#   - Direct RS485 users don't need this script, just configure device path directly
 
 # 自动设置串口权限（Auto-set serial port permissions）
 sudo chmod 666 /dev/ttyUSB* 2>/dev/null || true

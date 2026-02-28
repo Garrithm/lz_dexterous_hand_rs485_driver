@@ -214,6 +214,14 @@ public:
   int get_hand_id() const { return hand_id_; }
 
   /**
+   * @brief 设置总线保护参数（Set bus protection parameters）
+   * @param txn_interval_us 事务间最小间隔（微秒）
+   * @param write_settle_us 写后额外等待（微秒）
+   * @param max_retries 失败重试次数
+   */
+  void set_bus_protection(int txn_interval_us, int write_settle_us, int max_retries);
+
+  /**
    * @brief 启用/禁用调试输出（Enable/disable debug output）
    */
   void set_debug(bool enable);
@@ -236,6 +244,14 @@ private:
   std::array<int, 6> last_speeds_ = {500, 500, 500, 500, 500, 500};
   std::array<int, 6> last_forces_ = {500, 500, 500, 500, 500, 500};
   int max_step_size_ = 100;
+
+  // 总线保护（Bus protection）
+  std::chrono::steady_clock::time_point last_txn_time_{};
+  int txn_interval_us_ = 2000;         // 事务间最小间隔，默认2ms（configurable min gap between transactions）
+  int write_settle_us_ = 3000;         // 写后额外等待，给MCU执行时间，默认3ms（extra wait after write for MCU execution）
+  int max_retries_ = 2;                // 失败重试次数（retry count on failure）
+  void throttle();
+  void post_write_settle();
   
   // 调试标志（Debug flags）
   bool debug_enabled_ = false;

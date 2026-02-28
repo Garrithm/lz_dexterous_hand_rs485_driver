@@ -14,12 +14,12 @@ string joint_name
 uint16 motor_position
 
 # 关节角度（Joint angles）：单位0.1度（unit: 0.1 degree）
-uint16 mid_joint_angle     # 指中关节角度（Mid joint angle）
-uint16 root_joint_angle    # 指根关节角度（Root joint angle）
+uint16 mid_joint_angle
+uint16 root_joint_angle
 
 # 力反馈（Force feedback）：单位克（unit: gram）
-uint16 tip_force           # 指尖力（Tip force）
-uint16 mid_force           # 指中力（Mid force）
+uint16 tip_force
+uint16 mid_force
 
 # 有效标志（Validity flags）
 bool tip_force_valid

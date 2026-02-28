@@ -8,12 +8,12 @@ std_msgs/Header header
 uint8 hand_id
 
 # 位置控制（Position control）：0-1000
-uint16 thumb_rotation      # 大拇指翻转（Thumb rotation）
-uint16 thumb_bend          # 大拇指弯曲（Thumb bend）
-uint16 index_bend          # 食指弯曲（Index bend）
-uint16 middle_bend         # 中指弯曲（Middle bend）
-uint16 ring_bend           # 无名指弯曲（Ring bend）
-uint16 pinky_bend          # 小拇指弯曲（Pinky bend）
+uint16 thumb_rotation
+uint16 thumb_bend
+uint16 index_bend
+uint16 middle_bend
+uint16 ring_bend
+uint16 pinky_bend
 
 # 速度控制（Speed control）：0-1000
 uint16 thumb_rotation_speed
