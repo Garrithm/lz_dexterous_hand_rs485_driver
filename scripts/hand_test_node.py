@@ -3,11 +3,17 @@
 """
 灵巧手ROS2测试节点（LZ Hand ROS2 Test Node）
 
-灵巧手驱动交互测试。
-Interactive testing for dexterous hand driver.
-
 用法（Usage）:
+    # 单手测试（默认右手）
+    ros2 run lz_hand_rs485_driver hand_test_node.py
+    # 单手测试（左手）
     ros2 run lz_hand_rs485_driver hand_test_node.py --ros-args -p hand_id:=2
+    # 双手同时测试（命令同时发给两只手）
+    ros2 run lz_hand_rs485_driver hand_test_node.py --ros-args -p dual:=true
+    # 双手模式下只控制右手
+    ros2 run lz_hand_rs485_driver hand_test_node.py --ros-args -p dual:=true -p hand_id:=1
+    # 双手模式下只控制左手
+    ros2 run lz_hand_rs485_driver hand_test_node.py --ros-args -p dual:=true -p hand_id:=2
 """
 
 import rclpy
@@ -19,122 +25,142 @@ import time
 from typing import Optional
 
 from sensor_msgs.msg import JointState
-from lz_hand_rs485_driver.msg import HandControl, JointControl, HandFeedback, ForceFeedback, MotorFeedback
+from lz_hand_rs485_driver.msg import HandControl, JointControl, HandFeedback
 
 
 class LZHandTestNode(Node):
     """灵巧手测试节点（Hand Test Node）"""
-    
-    # 关节名称（Joint names）
+
     JOINT_NAMES = ["大拇指翻转", "大拇指弯曲", "食指", "中指", "无名指", "小拇指"]
-    
+
     def __init__(self):
         super().__init__('lz_hand_test')
-        
-        # 声明参数（Declare parameters）
-        self.declare_parameter('hand_id', 1)
+
+        self.declare_parameter('hand_id', 0)
         self.declare_parameter('dual', False)
         self.declare_parameter('default_speed', 500)
         self.declare_parameter('default_force', 500)
-        
-        # 加载参数（Load parameters）
+
         param = self.get_parameter('hand_id').value
         self._hand_id = int(param) if isinstance(param, str) else param
         self._dual = self.get_parameter('dual').get_parameter_value().bool_value
         self._default_speed = self.get_parameter('default_speed').get_parameter_value().integer_value
         self._default_force = self.get_parameter('default_force').get_parameter_value().integer_value
-        
-        # 话题前缀：双手模式按hand_id区分，单手模式统一/lz/
-        if self._dual:
-            hand_ns = 'right_hand' if self._hand_id == 1 else 'left_hand'
-            prefix = f'/lz/{hand_ns}'
+
+        qos = QoSProfile(reliability=ReliabilityPolicy.RELIABLE,
+                         history=HistoryPolicy.KEEP_LAST, depth=10)
+
+        # 构建 (hand_id, prefix) 列表
+        self._targets = []
+        if not self._dual:
+            hid = self._hand_id if self._hand_id in (1, 2) else 1
+            self._targets.append((hid, '/lz'))
+            label = '右手' if hid == 1 else '左手'
+            self.get_logger().info(f'单手模式: {label} ID={hid}, /lz/')
         else:
-            prefix = '/lz'
-        
-        hand_name = '右手' if self._hand_id == 1 else '左手'
-        self.get_logger().info(f'测试节点（Test node）: {hand_name} ID={self._hand_id}, 话题前缀: {prefix}/')
-        
-        # QoS配置（QoS profile）
-        qos = QoSProfile(reliability=ReliabilityPolicy.RELIABLE, history=HistoryPolicy.KEEP_LAST, depth=10)
-        
-        # 发布者（Publishers）
-        self._hand_pub = self.create_publisher(HandControl, f'{prefix}/hand_control', qos)
-        self._joint_pub = self.create_publisher(JointControl, f'{prefix}/joint_control', qos)
-        
-        # 订阅者（Subscribers）
-        self._feedback_sub = self.create_subscription(HandFeedback, f'{prefix}/hand_feedback', lambda m: setattr(self, '_feedback', m), qos)
-        self._joint_sub = self.create_subscription(JointState, f'{prefix}/joint_states', lambda m: setattr(self, '_joints', m), qos)
-        
-        # 状态（State）
-        self._feedback: Optional[HandFeedback] = None
-        self._joints: Optional[JointState] = None
-    
+            if self._hand_id == 1:
+                self._targets.append((1, '/lz/right_hand'))
+                self.get_logger().info('双手模式 → 仅右手: /lz/right_hand/')
+            elif self._hand_id == 2:
+                self._targets.append((2, '/lz/left_hand'))
+                self.get_logger().info('双手模式 → 仅左手: /lz/left_hand/')
+            else:
+                self._targets.append((1, '/lz/right_hand'))
+                self._targets.append((2, '/lz/left_hand'))
+                self.get_logger().info('双手模式 → 双手同时: /lz/right_hand/ + /lz/left_hand/')
+
+        # 为每个目标创建发布者和订阅者
+        self._pubs = []
+        self._feedbacks = {}
+        self._joints_data = {}
+
+        for hid, prefix in self._targets:
+            hand_pub = self.create_publisher(HandControl, f'{prefix}/hand_control', qos)
+            joint_pub = self.create_publisher(JointControl, f'{prefix}/joint_control', qos)
+            self._pubs.append((hid, hand_pub, joint_pub))
+
+            self._feedbacks[hid] = None
+            self._joints_data[hid] = None
+            self.create_subscription(
+                HandFeedback, f'{prefix}/hand_feedback',
+                lambda m, h=hid: self._feedbacks.__setitem__(h, m), qos)
+            self.create_subscription(
+                JointState, f'{prefix}/joint_states',
+                lambda m, h=hid: self._joints_data.__setitem__(h, m), qos)
+
     def send_hand(self, positions, speeds=None, forces=None):
         """发送手部控制（Send hand control）"""
-        msg = HandControl()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.hand_id = self._hand_id
-        
-        msg.thumb_rotation, msg.thumb_bend = positions[0], positions[1]
-        msg.index_bend, msg.middle_bend = positions[2], positions[3]
-        msg.ring_bend, msg.pinky_bend = positions[4], positions[5]
-        
-        s = speeds or [self._default_speed] * 6
-        msg.thumb_rotation_speed, msg.thumb_bend_speed = s[0], s[1]
-        msg.index_speed, msg.middle_speed, msg.ring_speed, msg.pinky_speed = s[2], s[3], s[4], s[5]
-        
-        f = forces or [self._default_force] * 6
-        msg.thumb_rotation_force, msg.thumb_bend_force = f[0], f[1]
-        msg.index_force, msg.middle_force, msg.ring_force, msg.pinky_force = f[2], f[3], f[4], f[5]
-        
-        self._hand_pub.publish(msg)
-        self.get_logger().info(f'发送手部位置（Hand pos）: {positions}')
-    
+        for hid, hand_pub, _ in self._pubs:
+            msg = HandControl()
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.hand_id = hid
+            msg.thumb_rotation, msg.thumb_bend = positions[0], positions[1]
+            msg.index_bend, msg.middle_bend = positions[2], positions[3]
+            msg.ring_bend, msg.pinky_bend = positions[4], positions[5]
+            s = speeds or [self._default_speed] * 6
+            msg.thumb_rotation_speed, msg.thumb_bend_speed = s[0], s[1]
+            msg.index_speed, msg.middle_speed, msg.ring_speed, msg.pinky_speed = s[2], s[3], s[4], s[5]
+            f = forces or [self._default_force] * 6
+            msg.thumb_rotation_force, msg.thumb_bend_force = f[0], f[1]
+            msg.index_force, msg.middle_force, msg.ring_force, msg.pinky_force = f[2], f[3], f[4], f[5]
+            hand_pub.publish(msg)
+        label = '右手' if len(self._pubs) == 1 and self._pubs[0][0] == 1 else \
+                '左手' if len(self._pubs) == 1 and self._pubs[0][0] == 2 else '双手'
+        self.get_logger().info(f'{label} 位置: {positions}')
+
     def send_joint(self, joint, position, speed=0, force=0):
         """发送单关节控制（Send single joint control）"""
         if not 0 <= joint <= 5:
             return
-        msg = JointControl()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.hand_id = self._hand_id
-        msg.joint_index = joint
-        msg.position = position
-        msg.speed = speed if speed > 0 else self._default_speed
-        msg.force = force if force > 0 else self._default_force
-        self._joint_pub.publish(msg)
-        self.get_logger().info(f'发送关节（Joint） {self.JOINT_NAMES[joint]}: {position}')
-    
+        for hid, _, joint_pub in self._pubs:
+            msg = JointControl()
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.hand_id = hid
+            msg.joint_index = joint
+            msg.position = position
+            msg.speed = speed if speed > 0 else self._default_speed
+            msg.force = force if force > 0 else self._default_force
+            joint_pub.publish(msg)
+        self.get_logger().info(f'{self.JOINT_NAMES[joint]}: {position}')
+
     # 手势（Gestures）
-    def open_hand(self): self.send_hand([0, 0, 0, 0, 0, 0])           # 张开（Open）
-    def thumbs_up(self): self.send_hand([0, 0, 1000, 1000, 1000, 1000])  # 竖大拇指（Thumbs up）
-    def peace(self): self.send_hand([500, 1000, 0, 0, 1000, 1000])       # 和平（Peace）
-    def pinch(self): self.send_hand([1000, 500, 500, 0, 0, 0])           # 捏取（Pinch）
-    def three(self): self.send_hand([0, 0, 0, 0, 1000, 1000])            # 三指（Three）
-    def four(self): self.send_hand([500, 1000, 0, 0, 0, 0])              # 四指（Four）
-    
+    def open_hand(self): self.send_hand([0, 0, 0, 0, 0, 0])
+    def thumbs_up(self): self.send_hand([0, 0, 1000, 1000, 1000, 1000])
+    def peace(self): self.send_hand([500, 1000, 0, 0, 1000, 1000])
+    def pinch(self): self.send_hand([1000, 500, 500, 0, 0, 0])
+    def three(self): self.send_hand([0, 0, 0, 0, 1000, 1000])
+    def four(self): self.send_hand([500, 1000, 0, 0, 0, 0])
+
     def print_feedback(self):
         """打印反馈数据（Print feedback）"""
-        if not self._feedback:
-            print('\n[暂无反馈数据（No feedback yet）]')
-            return
-        fb = self._feedback
-        print('\n' + '=' * 50)
-        print('  手部反馈（Hand Feedback）')
-        print('=' * 50)
-        print(f'电机位置: [{fb.thumb_rotation_pos}, {fb.thumb_bend_pos}, {fb.index_bend_pos}, {fb.middle_bend_pos}, {fb.ring_bend_pos}, {fb.pinky_bend_pos}]')
-        print('=' * 50)
-    
+        for hid, _ in self._targets:
+            fb = self._feedbacks.get(hid)
+            name = '右手' if hid == 1 else '左手'
+            if not fb:
+                print(f'\n[{name} 暂无反馈数据]')
+                continue
+            print(f'\n{"=" * 50}')
+            print(f'  {name} 反馈（Feedback）')
+            print(f'{"=" * 50}')
+            print(f'  电机位置: [{fb.thumb_rotation_pos}, {fb.thumb_bend_pos}, '
+                  f'{fb.index_bend_pos}, {fb.middle_bend_pos}, '
+                  f'{fb.ring_bend_pos}, {fb.pinky_bend_pos}]')
+            print(f'{"=" * 50}')
+
     def print_joints(self):
         """打印关节状态（Print joint states）"""
-        if not self._joints:
-            print('\n[暂无关节状态（No joint states yet）]')
-            return
-        print('\n' + '=' * 50)
-        print('  关节状态（Joint States）')
-        print('=' * 50)
-        for i, name in enumerate(self._joints.name[:6]):
-            print(f'  {name}: {self._joints.position[i]:.3f}')
-        print('=' * 50)
+        for hid, _ in self._targets:
+            js = self._joints_data.get(hid)
+            name = '右手' if hid == 1 else '左手'
+            if not js:
+                print(f'\n[{name} 暂无关节状态]')
+                continue
+            print(f'\n{"=" * 50}')
+            print(f'  {name} 关节状态（Joint States）')
+            print(f'{"=" * 50}')
+            for i, n in enumerate(js.name[:6]):
+                print(f'  {n}: {js.position[i]:.3f}')
+            print(f'{"=" * 50}')
 
 
 def print_menu():
@@ -167,17 +193,17 @@ def run_demo(node):
 def run_interactive(node, executor):
     """交互模式（Interactive mode）"""
     print_menu()
-    
+
     while rclpy.ok():
         try:
             executor.spin_once(timeout_sec=0.01)
             cmd = input('\n>>> ').strip()
             if not cmd:
                 continue
-            
+
             parts = cmd.split()
             c = parts[0].lower()
-            
+
             if c in ['q', 'quit']: break
             elif c == '1': node.open_hand()
             elif c == '2': node.thumbs_up()
@@ -208,29 +234,28 @@ def run_interactive(node, executor):
                         node.send_hand(pos)
                 except: print('  格式（Format）: m p0 p1 p2 p3 p4 p5')
             else:
-                print(f"  未知命令（Unknown）: '{cmd}'，输入'h'查看帮助（Type 'h' for help）")
-                
+                print(f"  未知命令（Unknown）: '{cmd}'，输入'h'查看帮助")
+
         except (EOFError, KeyboardInterrupt):
             break
         except Exception as e:
             print(f'  错误（Error）: {e}')
-    
+
     print('\n已退出（Exited）')
 
 
 def main(args=None):
     """主入口（Main entry）"""
     rclpy.init(args=args)
-    
+
     try:
         node = LZHandTestNode()
         executor = rclpy.executors.SingleThreadedExecutor()
         executor.add_node(node)
-        
+
         spin_thread = threading.Thread(target=executor.spin, daemon=True)
         spin_thread.start()
-        
-        # 解析命令，跳过ROS2参数（Parse command, skip ROS2 args）
+
         valid_cmds = ['demo', 'interactive', 'open', 'close']
         cmd = None
         skip = False
@@ -246,20 +271,20 @@ def main(args=None):
             if arg in valid_cmds:
                 cmd = arg
                 break
-        
+
         time.sleep(1.0)
-        
+
         if cmd == 'demo':
             run_demo(node)
         elif cmd == 'open':
             node.open_hand()
             time.sleep(2)
         elif cmd == 'close':
-            node.close_hand()
+            node.send_hand([1000] * 6)
             time.sleep(2)
         else:
             run_interactive(node, executor)
-            
+
     except KeyboardInterrupt:
         pass
     finally:

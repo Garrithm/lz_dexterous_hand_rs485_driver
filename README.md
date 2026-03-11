@@ -88,13 +88,39 @@ ros2 launch lz_hand_rs485_driver dual_hand_driver.launch.py \
 #### 测试与控制
 
 ```bash
-# 交互测试（另开终端）
+# 单手测试（默认右手，单手驱动模式下使用）
+ros2 run lz_hand_rs485_driver hand_test_node.py
+
+# 单手测试（左手）
 ros2 run lz_hand_rs485_driver hand_test_node.py --ros-args -p hand_id:=2
 
-# 双手模式测试（加 dual:=true，可同时开两个终端分别测左右手）
-ros2 run lz_hand_rs485_driver hand_test_node.py --ros-args -p hand_id:=1 -p dual:=true
-ros2 run lz_hand_rs485_driver hand_test_node.py --ros-args -p hand_id:=2 -p dual:=true
+# 双手同时测试（命令同时发给两只手，双手驱动模式下使用）
+ros2 run lz_hand_rs485_driver hand_test_node.py --ros-args -p dual:=true
+
+# 双手模式下只控制右手
+ros2 run lz_hand_rs485_driver hand_test_node.py --ros-args -p dual:=true -p hand_id:=1
+
+# 双手模式下只控制左手
+ros2 run lz_hand_rs485_driver hand_test_node.py --ros-args -p dual:=true -p hand_id:=2
 ```
+
+**测试节点交互命令：**
+
+| 命令 | 说明 |
+|------|------|
+| `1` | 张开（Open） |
+| `2` | 竖拇指（Thumbs up） |
+| `3` | 和平（Peace） |
+| `4` | 捏取（Pinch） |
+| `5` | 三指（Three） |
+| `6` | 四指（Four） |
+| `d` | 运行演示序列 |
+| `f` | 查看反馈数据 |
+| `j` | 查看关节状态 |
+| `p <关节0-5> <位置0-1000>` | 控制单个关节 |
+| `a <位置0-1000>` | 所有关节移到同一位置 |
+| `m p0 p1 p2 p3 p4 p5` | 分别设置6个关节位置 |
+| `q` | 退出 |
 
 #### 命令行控制
 
@@ -291,13 +317,39 @@ ros2 launch lz_hand_rs485_driver dual_hand_driver.launch.py \
 #### Testing and Control
 
 ```bash
-# Interactive test (open another terminal)
+# Single hand test (default right hand, use with single hand driver)
+ros2 run lz_hand_rs485_driver hand_test_node.py
+
+# Single hand test (left hand)
 ros2 run lz_hand_rs485_driver hand_test_node.py --ros-args -p hand_id:=2
 
-# Dual hand test (add dual:=true, can open two terminals for left/right)
-ros2 run lz_hand_rs485_driver hand_test_node.py --ros-args -p hand_id:=1 -p dual:=true
-ros2 run lz_hand_rs485_driver hand_test_node.py --ros-args -p hand_id:=2 -p dual:=true
+# Dual hand test (commands sent to both hands, use with dual hand driver)
+ros2 run lz_hand_rs485_driver hand_test_node.py --ros-args -p dual:=true
+
+# Dual mode - control right hand only
+ros2 run lz_hand_rs485_driver hand_test_node.py --ros-args -p dual:=true -p hand_id:=1
+
+# Dual mode - control left hand only
+ros2 run lz_hand_rs485_driver hand_test_node.py --ros-args -p dual:=true -p hand_id:=2
 ```
+
+**Test node interactive commands:**
+
+| Command | Description |
+|---------|-------------|
+| `1` | Open hand |
+| `2` | Thumbs up |
+| `3` | Peace sign |
+| `4` | Pinch |
+| `5` | Three fingers |
+| `6` | Four fingers |
+| `d` | Run demo sequence |
+| `f` | View feedback data |
+| `j` | View joint states |
+| `p <joint0-5> <pos0-1000>` | Control single joint |
+| `a <pos0-1000>` | Move all joints to same position |
+| `m p0 p1 p2 p3 p4 p5` | Set 6 joint positions individually |
+| `q` | Quit |
 
 #### Command Line Control
 
